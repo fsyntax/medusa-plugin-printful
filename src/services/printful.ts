@@ -1,194 +1,161 @@
-import {Product, ProductService, ProductVariant, TransactionBaseService} from "@medusajs/medusa"
+import {FulfillmentService, OrderService, ProductService, TransactionBaseService} from "@medusajs/medusa"
 import {EntityManager} from "typeorm"
-import {PrintfulClient, request} from "printful-request"
+import {PrintfulClient} from "printful-request"
 import {
-    CreateProductInput,
-    CreateProductProductVariantInput, ProductSelector,
-    UpdateProductInput
-} from "@medusajs/medusa/dist/types/product";
-import {ProductVariantPrice, UpdateProductVariantInput} from "@medusajs/medusa/dist/types/product-variant";
-import {create, kebabCase} from "lodash";
+    CreateFulfillmentOrder,
+    CreateShipmentConfig,
+    FulFillmentItemType
+} from "@medusajs/medusa/dist/types/fulfillment";
 
-// TODO: move to env
-const PRINTFUL_ACCESS_TOKEN = "HhN1J8dFDwT4XxUolNUF5xQERHppnLy3fTWRitQA"
-const PRINTFUL_STORE_ID = "9893380"
+interface ShippingRates {
+    recipient: {
+        address1: string,
+        city: string,
+        country_code: string,
+        state_code?: string,
+        zip?: string
+        phone?: string
+    }
+    items: [
+        {
+            variant_id?: string,
+            external_variant_id?: string,
+            quantity: number,
+            value?: string
+        }
+    ]
+}
+
+interface CalculateTaxRate {
+    recipient: {
+        country_code: string,
+        state_code: string,
+        city: string,
+        zip: string
+    }
+}
 
 class PrintfulService extends TransactionBaseService {
+
     protected manager_: EntityManager
     protected transactionManager_: EntityManager
     private productService: ProductService;
+    private orderService: OrderService;
     private printfulClient: any;
     private readonly storeId: any;
-    private readonly printfulApiToken: any;
-    private productVariantService: any;
-    private shippingProfileService: any;
-    private salesChannelService: any;
+    private readonly printfulAccessToken: any;
+    private fulfillmentService: any;
 
     constructor(container, options) {
         super(container);
         this.productService = container.productService;
-        this.productVariantService = container.productVariantService;
-        this.shippingProfileService = container.shippingProfileService;
-        this.salesChannelService = container.salesChannelService;
-        this.printfulClient = new PrintfulClient(PRINTFUL_ACCESS_TOKEN);
-        this.storeId = PRINTFUL_STORE_ID;
-
-
+        this.orderService = container.orderService;
+        this.fulfillmentService = container.fulfillmentService;
+        this.printfulClient = new PrintfulClient(options.printfulAccessToken);
+        this.storeId = options.storeId;
     }
 
-    async getScopes() {
-        const scopes = await this.printfulClient.get("oauth/scopes");
-        return scopes;
+
+    async getShippingRates(data) {
+        const {recipient, items} = data;
+        const {result: shippingRates} = await this.printfulClient.post("shipping/rates", {
+            recipient,
+            items
+        }, {store_id: this.storeId});
+        return shippingRates.result;
     }
 
-    async syncPrintfulProducts() {
-        // TODO: Add store id to env
-        const products = []
-        const {result: availableProducts} = await this.printfulClient.get("store/products", {store_id: this.storeId});
+    async getCountryList() {
+        const {result: countries} = await this.printfulClient.get("countries", {store_id: this.storeId});
+        if (countries) return countries;
+    }
 
-        for (let product of availableProducts) {
-            const {
-                result: {
-                    sync_product,
-                    sync_variants
+    async getTaxCountriesList() {
+        const {result: taxCountries} = await this.printfulClient.get("tax/countries", {store_id: this.storeId});
+        if (taxCountries) return taxCountries;
+    }
+
+    async calculateTaxRate(recipient: CalculateTaxRate) {
+        const {result: taxRate} = await this.printfulClient.post("tax/rates", {recipient}, {store_id: this.storeId});
+        if (taxRate) return taxRate;
+    }
+
+    async estimateOrderCosts(recipient: any, items: any) {
+        const {result: orderCosts} = await this.printfulClient.post("orders/estimate-costs", {
+            recipient,
+            items
+        }, {store_id: this.storeId});
+
+        return orderCosts;
+    }
+
+    async createOrder(data: any) {
+        const orderObj = {
+            external_id: data.id,
+            recipient: {
+                name: data.shipping_address.first_name + " " + data.shipping_address.last_name,
+                address1: data.shipping_address.address_1,
+                address2: data.shipping_address.address_2,
+                city: data.shipping_address.city,
+                state_code: data.shipping_address.province,
+                country_code: data.shipping_address.country,
+                zip: data.shipping_address.zip,
+                email: data.email
+            },
+            items: data.items.map((item) => {
+                return {
+                    id: item.external_id,
+                    variant_id: item.variant.id,
+                    quantity: item.quantity,
+                    price: item.total,
                 }
-            } = await this.printfulClient.get(`sync/products/${product.id}`, {store_id: this.storeId});
-            const builtProduct = {...sync_product, variants: sync_variants};
-            products.push(builtProduct);
+            })
         }
-
-        if (products.length > 0) {
-            for (let product of products) {
-                const existingProduct = await this.checkIfProductExists(product.id);
-                if (existingProduct) {
-                    // build the product object according to UpdateProductInput type
-
-                    const productObj: UpdateProductInput = {
-                        title: product.name,
-                        thumbnail: product.thumbnail_url,
-                    }
-                    await this.productService.update(existingProduct.id, productObj);
-
-                    const variantsObj = product.variants.map((variant) => {
-                        return {
-                            sku: variant.sku,
-                            data: {
-                                title: variant.name,
-                                sku: variant.sku,
-                                // options: {value: variant.id},
-                            }
-                        }
-                    })
-
-                    for (let variant of variantsObj) {
-                        await this.updateVariantInMedusa(variant.sku, variant.data)
-                    }
-
-
-                } else {
-
-                    const defaultShippingProfile = await this.shippingProfileService.retrieveDefault();
-                    const defaultSalesChannel = await this.salesChannelService.retrieveDefault();
-                    // build the product object according to CreateProductInput type
-                    console.log(defaultSalesChannel)
-                    const productObj: CreateProductInput = {
-                        title: product.name,
-                        handle: kebabCase(product.name),
-                        thumbnail: product.thumbnail_url,
-                        options: [{title: "Printful Variant"}],
-                        profile_id: defaultShippingProfile.id,
-                        external_id: product.id,
-                        sales_channels: [{id: defaultSalesChannel.id}],
-                        metadata: {
-                            printful_id: product.id
-                        }
-                    }
-
-                    // TODO: add ts typings
-                    const productVariantsObj = product.variants.map((variant) => {
-                        return {
-                            title: variant.name,
-                            sku: variant.sku,
-                            external_id: variant.id,
-                            options: {value: variant.id},
-                            manage_inventory: false,
-                            allow_backorder: true,
-                            inventory_quantity: 100,
-                            // prices: [{amount: parseInt(variant.retail_price, 10) * 100, currency_code: variant.currency}],
-                            metadata: {
-                                printful_id: variant.id
-                            }
-                        }
-                    })
-
-                    const productToPush = {
-                        ...productObj,
-                        variants: productVariantsObj
-                    }
-
-                    try {
-                        await this.createProductInMedusa(productToPush);
-                    } catch (e) {
-                        console.log(e);
-                    }
-                }
+        try {
+            const order = await this.printfulClient.post("orders", {orderObj}, {
+                store_id: this.storeId,
+                confirm: false // dont skip draft phase
+            });
+            if (order.code === 200) {
+                // TODO: Send confirmation email to customer
+                console.log("Order created: ", order.result)
             }
-        }
-        return this.productService.list({q: ''});
-
-    }
-
-    async checkIfProductExists(id: string) {
-        const product = await this.productService.list({external_id: id});
-        if (product.length > 0) {
-            return product[0];
-        }
-        return false;
-    }
-
-    async createProductInMedusa(product: CreateProductInput) {
-        const createdProduct = await this.productService.create(product);
-        console.log(`Successfully created product ${createdProduct.title} in Medusa`)
-        return createdProduct;
-    }
-
-    async updateProductInMedusa(productOrProductId: string, product: UpdateProductInput) {
-        const updatedProduct = await this.productService.update(productOrProductId, product);
-        console.log(`Successfully updated product ${updatedProduct.title} in Medusa`)
-
-        return updatedProduct;
-    }
 
 
-    async createVariantInMedusa(productOrProductId: string | Product, variant: CreateProductProductVariantInput) {
-        const createdVariant = await this.productVariantService.create(productOrProductId, variant);
-        console.log(`Successfully created variant ${createdVariant.title} in Medusa`)
-
-        return createdVariant;
-    }
-
-    async updateVariantInMedusa(variantSku: string, update: UpdateProductVariantInput) {
-        const variant = await this.productVariantService.retrieveBySKU(variantSku);
-        const updatedVariant = await this.productVariantService.update(variant.id, update);
-        if (updatedVariant) {
-            console.log(`Successfully updated variant ${updatedVariant.title} in Medusa`)
-        } else {
-            console.log(`Failed to update variant ${variant.title} in Medusa`)
+        } catch (e) {
+            console.log(e)
         }
     }
 
-    async updateVariantOptionValueInMedusa(variantId: string, optionId: string, optionValue: string) {
-        const updatedVariant = await this.productVariantService.updateOptionValue(variantId, optionId, optionValue);
-        return updatedVariant;
+    async confirmDraftForFulfillment(orderId: string | number) {
+        const confirmedOrder = await this.printfulClient.post(`orders/${orderId}/confirm`, {store_id: this.storeId});
+        console.log(confirmedOrder)
+        return confirmedOrder;
     }
 
-    async updateVariantPricesInMedusa(variantId: string, prices: ProductVariantPrice) {
-        const updatedVariant = await this.productVariantService.updatePrices(variantId, prices);
-        return updatedVariant;
-
+    async getOrderData(orderId: string | number) {
+        const {result: orderData} = await this.printfulClient.get(`orders/${orderId}`, {store_id: this.storeId});
+        return orderData;
     }
 
+    async createMedusaFulfillment(order: CreateFulfillmentOrder, itemsToFulfill: FulFillmentItemType[]) {
 
+
+        console.log("LENGTH", itemsToFulfill.length)
+
+        const fulfillmentItems = await this.fulfillmentService.getFulfillmentItems_(order, itemsToFulfill);
+        console.log("FULFILLMENT ITEMS", fulfillmentItems)
+
+        return;
+
+        const fulfillment = await this.fulfillmentService.createFulfillment(order, itemsToFulfill);
+        return fulfillment;
+    }
+
+    async createMedusaShipment(fulfillmentId: string, trackingLinks: { tracking_number: string }[], config: CreateShipmentConfig) {
+        const shipment = await this.fulfillmentService.createShipment(fulfillmentId, trackingLinks, config);
+        return shipment;
+    }
 }
 
 export default PrintfulService;
