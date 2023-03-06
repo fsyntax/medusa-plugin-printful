@@ -35,9 +35,9 @@ class PrintfulSyncService extends TransactionBaseService {
         this.printfulWebhooksService = container.printfulWebhooksService;
 
         if (this.enableSync) {
-            this.syncPrintfulProducts().then(r => console.log("Successfully synced products from Printful", r)).catch(e => {
-                throw new Error("Error syncing products from Printful")
-            });
+            setTimeout(async () => {
+                await this.syncPrintfulProducts()
+            }, 3000)
         }
         if (options.enableWebhooks) {
             this.printfulWebhooksService.createWebhooks().then().catch(e => {
@@ -51,126 +51,23 @@ class PrintfulSyncService extends TransactionBaseService {
         return await this.printfulClient.get("oauth/scopes");
     }
 
-
     async syncPrintfulProducts() {
-        const products = []
-        const {result: availableProducts} = await this.printfulClient.get("store/products", {store_id: this.storeId});
+        console.info("Heya! Starting to sync products from Printful! 👀")
+        const {result: syncableProducts} = await this.printfulClient.get("store/products", {store_id: this.storeId});
 
-        for (let product of availableProducts) {
-            const {
-                result: {
-                    sync_product,
-                    sync_variants
-                }
-            } = await this.printfulClient.get(`sync/products/${product.id}`, {store_id: this.storeId});
-
-            const variantOptions = await Promise.all(sync_variants.map(async (variant) => {
-                const {result: {variant: options}} = await this.printfulClient.get(`products/variant/${variant.variant_id}`);
-                return options;
-            }));
-
-            // add variantOptions to sync_variants based on variant_id and id of variantOptions
-            const builtVariants = sync_variants.map((variant) => {
-                const variantOption = variantOptions.find((option) => option.id === variant.variant_id);
-                return {...variant, ...variantOption}
-            })
-
-
-            const builtProduct = {...sync_product, variants: builtVariants}
-            products.push(builtProduct);
-        }
-
-        if (products.length > 0) {
-
-            for (let product of products) {
-
-                const existingProduct = await this.checkIfProductExists(product.id);
-
-                if (existingProduct.id) {
-                    const productObj: UpdateProductInput = {
-                        title: product.name,
-                        thumbnail: product.thumbnail_url,
-                    }
-
-                    await this.productService.update(existingProduct.id, productObj);
-
-
-                    for (let existingVariant of existingProduct.variants) {
-                        const printfulVariantId = existingVariant.metadata.printful_id;
-                        const matchingVariant = product.variants.find((v) => v.id === printfulVariantId);
-
-                        if (matchingVariant) {
-                            const variantObj: any = {
-                                title: `${existingProduct.title} - ${matchingVariant.size} / ${matchingVariant.color}`,
-                                sku: matchingVariant.sku,
-                                price: parseFloat(matchingVariant.retail_price) * 100,
-                                currency_code: matchingVariant.currency.toLowerCase(),
-                            };
-                            await this.productVariantService.update(existingVariant.id, variantObj);
-                            await this.productVariantService.updateVariantPrices(existingVariant.id, [{
-                                amount: variantObj.price,
-                                currency_code: variantObj.currency_code
-                            }]);
-                        }
-                    }
-
-                } else {
-                    console.log("Creating product in Medusa");
-                    const defaultShippingProfile = await this.shippingProfileService.retrieveDefault();
-                    const defaultSalesChannel = await this.salesChannelService.retrieveDefault();
-
-                    const productObj: CreateProductInput = {
-                        title: product.name,
-                        handle: kebabCase(product.name),
-                        thumbnail: product.thumbnail_url,
-                        options: [{title: "size"}, {title: "color"}],
-                        profile_id: defaultShippingProfile.id,
-                        external_id: product.id,
-                        sales_channels: [{id: defaultSalesChannel.id}],
-                        metadata: {
-                            printful_id: product.id
-                        }
-                    }
-                    const productVariantsObj = product.variants.map((variant) => {
-                        return {
-                            title: `${productObj.title} - ${variant.size} / ${variant.color}`,
-                            sku: variant.sku,
-                            external_id: variant.id,
-                            manage_inventory: false,
-                            allow_backorder: true,
-                            inventory_quantity: 100,
-                            prices: [{
-                                amount: parseFloat(variant.retail_price) * 100,
-                                currency_code: variant.currency.toLowerCase()
-                            }],
-                            metadata: {
-                                printful_id: variant.id,
-                                size: variant.size,
-                                color: variant.color,
-                                color_code: variant.color_code
-                            }
-                        }
-                    })
-                    console.log("productVariantsObj", productVariantsObj[0])
-
-                    const productToPush = {
-                        ...productObj,
-                        variants: productVariantsObj,
-                    }
-
-                    try {
-                        const createdProduct = await this.createProductInMedusa(productToPush);
-                        if (createdProduct) {
-                            console.log(createdProduct)
-                        }
-                    } catch (e) {
-                        console.log(e);
-                    }
-                }
+        for (let product of syncableProducts) {
+            const existingProduct = await this.checkIfProductExists(product.id.toString());
+            if (existingProduct) {
+                console.log(`Product ${existingProduct.title} already exists in Medusa! Preparing to update.. 🚧`)
+                await this.printfulService.updateProduct(product, "fromPrintful", null);
+            } else {
+                console.log(`Product ${product.name} does not exist in Medusa! Preparing to create.. ⚙️`)
+                await this.printfulService.createProductInMedusa(product);
             }
         }
-        return this.productService.list({q: ''}, {relations: ['variants']});
+        return "Syncing done!"
     }
+
 
     async addProductOptions(productId, optionTitle) {
         try {
@@ -232,83 +129,16 @@ class PrintfulSyncService extends TransactionBaseService {
 
 
     async checkIfProductExists(id: string) {
-        const product = await this.productService.list({external_id: id}, {relations: ['variants']});
-        if (product.length > 0) {
-            return product[0];
-        }
-        return [];
-    }
-
-    async createProductInMedusa(product: CreateProductInput) {
-
-        const createdProduct = await this.productService.create(product);
-
-        if (createdProduct) {
-            const {variants, options} = await this.productService.retrieve(createdProduct.id, {
-                relations: ['variants', 'options'],
-            });
-
-            for (const option of options) {
-                for (const variant of variants) {
-                    if (option.title === 'size' || option.title === 'color') {
-                        const value = variant.metadata[option.title];
-                        console.log(`Variant ${variant.id}: option ${option.title} = ${value}`);
-                        // if (value !== undefined && option.values && value !== option.values[0].value) {
-                        console.log(`Updating variant ${variant.id} option ${option.id} to ${value}`);
-                        await this.productVariantService.addOptionValue(variant.id, option.id, value);
-                        // }
-                    }
-                }
-            }
-        }
-
-        console.log(`Successfully created product ${createdProduct.title} in Medusa`)
-        return createdProduct;
-    }
-
-
-    async updateProductInMedusa(productOrProductId: string, product: UpdateProductInput) {
-        const updatedProduct = await this.productService.update(productOrProductId, product);
-        if (updatedProduct) {
-            console.log(`Successfully updated product ${updatedProduct.title} in Medusa`)
-        }
-        // return updatedProduct;
-    }
-
-
-    async updateVariantInMedusa(variant_id: string, update: UpdateProductVariantInput) {
-        const variant = await this.productVariantService.retrieve(variant_id);
-        const updatedVariant = await this.productVariantService.update(variant.id, update);
-        if (updatedVariant) {
-            console.log(`Successfully updated variant ${updatedVariant.title} in Medusa`)
-        } else {
-            console.log(`Failed to update variant ${variant.title} in Medusa`)
-        }
-        if (update.prices) {
-            const prices = update.prices.map(price => {
-                return {
-                    amount: price.amount,
-                    currency_code: price.currency_code.toLowerCase()
-                }
-            })
-            await this.productVariantService.updateVariantPrices(variant.id, prices);
-        }
-    }
-
-
-    async updateVariantOptionValueInMedusa(variantId: string, optionId: string, optionValue: string) {
-        return await this.productVariantService.updateOptionValue(variantId, optionId, optionValue);
-    }
-
-
-    async deleteProduct(productOrProductId: string) {
         try {
-            await this.productService.delete(productOrProductId);
-            console.log(`Successfully deleted product ${productOrProductId} in Medusa`)
+            const product = await this.productService.retrieveByExternalId(id, {relations: ['variants']});
+            if (product) {
+                return product;
+            }
         } catch (e) {
-            console.log(`Failed to delete product ${productOrProductId} in Medusa`)
+            return false;
         }
     }
+
 
 }
 

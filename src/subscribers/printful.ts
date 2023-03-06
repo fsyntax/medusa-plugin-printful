@@ -37,8 +37,8 @@ class PrintfulSubscriber {
         eventBusService.subscribe("order.updated", this.handleOrderUpdated);
         eventBusService.subscribe("order.completed", this.handleOrderCompleted);
         eventBusService.subscribe("payment.payment_captured", this.handlePaymentCaptured);
-        eventBusService.subscribe("product.updated", this.handleMedusaProductUpdated);
-        eventBusService.subscribe("product-variant.updated", this.handleMedusaVariantUpdated);
+        // eventBusService.subscribe("product.updated", this.handleMedusaProductUpdated);
+        // eventBusService.subscribe("product-variant.updated", this.handleMedusaVariantUpdated);
     }
 
     handlePrintfulProductUpdated = async (data: any) => {
@@ -52,28 +52,25 @@ class PrintfulSubscriber {
         const listedProducts = await this.productService.list({external_id: printfulProduct.id});
 
         if (listedProducts.length === 0) {
-            console.log(`Couldn't update product with id ${printfulProduct.id} in Medusa, does it exist? \n ${printfulProduct}`)
+            console.log(`Couldn't update product with id ${printfulProduct.id} in Medusa, does it exist yet? Attempting to create it! \n`)
+            try {
+                await this.printfulService.createProductInMedusa({
+                    ...printfulProduct,
+                    variants: printfulProductVariants
+                })
+            } catch (e) {
+                console.log("Error creating product in Medusa", e)
+            }
             return;
         } else if (listedProducts.length > 1) {
             console.log(`Found multiple products with id ${printfulProduct.id} in Medusa, this shouldn't happen!`)
             return;
         }
 
-        const updatedProduct = await this.printfulService.updateProduct(listedProducts[0].id, {
-            title: printfulProduct.name,
-            handle: kebabCase(printfulProduct.name),
-            thumbnail: printfulProduct.thumbnail_url,
-            external_id: printfulProduct.id,
-            metadata: {
-                printful_id: printfulProduct.id,
-                printful_synced_at: new Date().toISOString(),
-            }
-        }, "fromPrintful");
-
-        if (updatedProduct) {
-
-
-        }
+        await this.printfulService.updateProduct({
+            ...printfulProduct,
+            variants: printfulProductVariants
+        }, "fromPrintful", null);
 
 
     }
