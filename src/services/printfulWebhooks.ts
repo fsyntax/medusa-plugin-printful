@@ -1,15 +1,17 @@
 import {TransactionBaseService} from "@medusajs/medusa"
 import {EntityManager} from "typeorm"
-import {PrintfulClient, request} from "printful-request"
+import {PrintfulClient} from "printful-request"
 
 
 class PrintfulWebhooksService extends TransactionBaseService {
     protected manager_: EntityManager
     protected transactionManager_: EntityManager
-    private printfulClient: any;
     private readonly storeId: any;
     private readonly backendUrl: any;
+    private printfulClient: any;
     private eventBusService: any;
+    private readonly enableWebhooks: any;
+    private readonly printfulAccessToken: any;
 
 
     constructor(container, options) {
@@ -17,12 +19,18 @@ class PrintfulWebhooksService extends TransactionBaseService {
         this.printfulClient = new PrintfulClient(options.printfulAccessToken);
         this.storeId = options.storeId;
         this.backendUrl = options.backendUrl;
+        this.printfulAccessToken = options.printfulAccessToken;
         this.eventBusService = container.eventBusService;
+        this.enableWebhooks = options.enableWebhooks;
+
+
     }
 
     async createWebhooks() {
+        console.log("Setting up Printful Webhook Support... 🚀")
         const currentWebhookConfig = await this.printfulClient.get("webhooks", {store_id: this.storeId});
-        if (currentWebhookConfig.url !== `${this.backendUrl}/printful/webhooks`) {
+        console.log("Current Printful Webhook Config: ", currentWebhookConfig)
+        if (currentWebhookConfig.url !== `${this.backendUrl}/printful/webhook`) {
             const webhookTypes = [
                 "package_shipped",
                 "package_returned",
@@ -43,8 +51,17 @@ class PrintfulWebhooksService extends TransactionBaseService {
                 types: webhookTypes,
             });
             if (setWebhookConfig.code === 200) {
-                console.log("Webhooks created successfully")
+                console.log("Successfully set up Printful Webhook Support! 🥳");
             }
+        } else {
+            console.log("Printful Webhook Support is already enabled! 🎉")
+        }
+    }
+
+    async disableWebhooks() {
+        const webhooksDisabled = await this.printfulClient.delete("webhooks", {store_id: this.storeId});
+        if (webhooksDisabled.code === 200) {
+            return "Printful Webhook Support is disabled! 👀"
         }
     }
 

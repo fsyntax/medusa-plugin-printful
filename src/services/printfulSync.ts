@@ -1,14 +1,9 @@
-import {Product, ProductService, ProductVariant, TransactionBaseService} from "@medusajs/medusa"
+import {ProductService, TransactionBaseService} from "@medusajs/medusa"
 import {EntityManager} from "typeorm"
-import {PrintfulClient, request} from "printful-request"
-import {
-    CreateProductInput,
-    CreateProductProductVariantInput,
-    UpdateProductInput
-} from "@medusajs/medusa/dist/types/product";
-import {ProductVariantPrice, UpdateProductVariantInput} from "@medusajs/medusa/dist/types/product-variant";
-import {create, kebabCase} from "lodash";
-import {CreateRegionInput} from "@medusajs/medusa/dist/types/region";
+import {PrintfulClient} from "printful-request"
+import {CreateProductInput, UpdateProductInput} from "@medusajs/medusa/dist/types/product";
+import {UpdateProductVariantInput} from "@medusajs/medusa/dist/types/product-variant";
+import {kebabCase} from "lodash";
 
 class PrintfulSyncService extends TransactionBaseService {
     protected manager_: EntityManager
@@ -16,13 +11,14 @@ class PrintfulSyncService extends TransactionBaseService {
     private productService: ProductService;
     private printfulClient: any;
     private readonly storeId: any;
-    private readonly printfulApiToken: any;
+    private readonly enableSync: Boolean;
     private productVariantService: any;
     private shippingProfileService: any;
     private salesChannelService: any;
     private shippingOptionService: any;
     private regionService: any;
     private printfulService: any;
+    private printfulWebhooksService: any;
 
     constructor(container, options) {
         super(container);
@@ -35,20 +31,31 @@ class PrintfulSyncService extends TransactionBaseService {
         this.printfulService = container.printfulService;
         this.printfulClient = new PrintfulClient(options.printfulAccessToken);
         this.storeId = options.storeId;
+        this.enableSync = options.enableSync;
+        this.printfulWebhooksService = container.printfulWebhooksService;
 
+        if (this.enableSync) {
+            this.syncPrintfulProducts().then(r => console.log("Successfully synced products from Printful", r)).catch(e => {
+                throw new Error("Error syncing products from Printful")
+            });
+        }
+        if (options.enableWebhooks) {
+            this.printfulWebhooksService.createWebhooks().then().catch(e => {
+                throw new Error("Error creating Printful Webhooks")
+            });
+        }
 
     }
 
     async getScopes() {
-        const scopes = await this.printfulClient.get("oauth/scopes");
-        return scopes;
+        return await this.printfulClient.get("oauth/scopes");
     }
 
 
     async syncPrintfulProducts() {
-        // TODO: Add store id to env
         const products = []
         const {result: availableProducts} = await this.printfulClient.get("store/products", {store_id: this.storeId});
+
         for (let product of availableProducts) {
             const {
                 result: {
@@ -74,37 +81,38 @@ class PrintfulSyncService extends TransactionBaseService {
         }
 
         if (products.length > 0) {
+
             for (let product of products) {
 
                 const existingProduct = await this.checkIfProductExists(product.id);
+
                 if (existingProduct.id) {
                     const productObj: UpdateProductInput = {
                         title: product.name,
                         thumbnail: product.thumbnail_url,
                     }
+
                     await this.productService.update(existingProduct.id, productObj);
 
 
-                    const variantsObj = product.variants.map((variant) => {
-                        return {
-                            sku: variant.sku,
-                            data: {
-                                title: variant.name,
-                                sku: variant.sku,
-                                price: variant.retail_price,
-                                external_id: variant.id,
-                            }
+                    for (let existingVariant of existingProduct.variants) {
+                        const printfulVariantId = existingVariant.metadata.printful_id;
+                        const matchingVariant = product.variants.find((v) => v.id === printfulVariantId);
+
+                        if (matchingVariant) {
+                            const variantObj: any = {
+                                title: `${existingProduct.title} - ${matchingVariant.size} / ${matchingVariant.color}`,
+                                sku: matchingVariant.sku,
+                                price: parseFloat(matchingVariant.retail_price) * 100,
+                                currency_code: matchingVariant.currency.toLowerCase(),
+                            };
+                            await this.productVariantService.update(existingVariant.id, variantObj);
+                            await this.productVariantService.updateVariantPrices(existingVariant.id, [{
+                                amount: variantObj.price,
+                                currency_code: variantObj.currency_code
+                            }]);
                         }
-                    })
-
-                    // for (let variant of variantsObj) {
-                    //     await this.updateVariantCurrencyPrice(variant.sku, variant.data.price)
-                    // }
-                    //
-                    // for (let variant of variantsObj) {
-                    //     await this.updateVariantInMedusa(variant.sku, variant.data)
-                    // }
-
+                    }
 
                 } else {
                     console.log("Creating product in Medusa");
@@ -123,24 +131,18 @@ class PrintfulSyncService extends TransactionBaseService {
                             printful_id: product.id
                         }
                     }
-
-
-                    // TODO: add ts typings
-
                     const productVariantsObj = product.variants.map((variant) => {
                         return {
-                            title: variant.name,
+                            title: `${productObj.title} - ${variant.size} / ${variant.color}`,
                             sku: variant.sku,
                             external_id: variant.id,
                             manage_inventory: false,
                             allow_backorder: true,
                             inventory_quantity: 100,
-                            // prices: [{
-                            //     amount: variant.retail_price ? parseFloat(variant.retail_price) * 100 : 0,
-                            //     currency_code: variant.currency
-                            // }],
-                            ...variant.size,
-                            ...variant.color,
+                            prices: [{
+                                amount: parseFloat(variant.retail_price) * 100,
+                                currency_code: variant.currency.toLowerCase()
+                            }],
                             metadata: {
                                 printful_id: variant.id,
                                 size: variant.size,
@@ -149,7 +151,7 @@ class PrintfulSyncService extends TransactionBaseService {
                             }
                         }
                     })
-
+                    console.log("productVariantsObj", productVariantsObj[0])
 
                     const productToPush = {
                         ...productObj,
@@ -230,7 +232,7 @@ class PrintfulSyncService extends TransactionBaseService {
 
 
     async checkIfProductExists(id: string) {
-        const product = await this.productService.list({external_id: id});
+        const product = await this.productService.list({external_id: id}, {relations: ['variants']});
         if (product.length > 0) {
             return product[0];
         }
@@ -274,27 +276,28 @@ class PrintfulSyncService extends TransactionBaseService {
     }
 
 
-    // async createVariantInMedusa(productOrProductId: string | Product, variant: CreateProductProductVariantInput) {
-    //     const createdVariant = await this.productVariantService.create(productOrProductId, variant);
-    //     console.log(`Successfully created variant ${createdVariant.title} in Medusa`)
-    //
-    //     return createdVariant;
-    // }
-
-    async updateVariantInMedusa(variantSku: string, update: UpdateProductVariantInput) {
-        const variant = await this.productVariantService.retrieveBySKU(variantSku);
+    async updateVariantInMedusa(variant_id: string, update: UpdateProductVariantInput) {
+        const variant = await this.productVariantService.retrieve(variant_id);
         const updatedVariant = await this.productVariantService.update(variant.id, update);
         if (updatedVariant) {
             console.log(`Successfully updated variant ${updatedVariant.title} in Medusa`)
         } else {
             console.log(`Failed to update variant ${variant.title} in Medusa`)
         }
+        if (update.prices) {
+            const prices = update.prices.map(price => {
+                return {
+                    amount: price.amount,
+                    currency_code: price.currency_code.toLowerCase()
+                }
+            })
+            await this.productVariantService.updateVariantPrices(variant.id, prices);
+        }
     }
 
 
     async updateVariantOptionValueInMedusa(variantId: string, optionId: string, optionValue: string) {
-        const updatedVariant = await this.productVariantService.updateOptionValue(variantId, optionId, optionValue);
-        return updatedVariant;
+        return await this.productVariantService.updateOptionValue(variantId, optionId, optionValue);
     }
 
 

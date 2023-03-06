@@ -1,5 +1,5 @@
 import {kebabCase} from "lodash";
-import {CreateFulfillmentOrder, FulFillmentItemType} from "@medusajs/medusa/dist/types/fulfillment";
+
 
 class PrintfulSubscriber {
     private printfulSyncService: any;
@@ -7,6 +7,8 @@ class PrintfulSubscriber {
     private orderService_: any;
     private printfulFulfillmentService: any;
     private fulfillmentService: any;
+    private printfulService: any;
+    private productVariantService: any;
 
     constructor({
                     eventBusService,
@@ -14,13 +16,17 @@ class PrintfulSubscriber {
                     printfulSyncService,
                     productService,
                     printfulFulfillmentService,
-                    fulfillmentService
+                    fulfillmentService,
+                    printfulService,
+                    productVariantService
                 }) {
         this.printfulSyncService = printfulSyncService;
         this.productService = productService
         this.printfulFulfillmentService = printfulFulfillmentService;
         this.orderService_ = orderService;
         this.fulfillmentService = fulfillmentService;
+        this.printfulService = printfulService;
+        this.productVariantService = productVariantService;
 
         eventBusService.subscribe("printful.product_updated", this.handlePrintfulProductUpdated);
         eventBusService.subscribe("printful.product_deleted", this.handlePrintfulProductDeleted);
@@ -31,17 +37,45 @@ class PrintfulSubscriber {
         eventBusService.subscribe("order.updated", this.handleOrderUpdated);
         eventBusService.subscribe("order.completed", this.handleOrderCompleted);
         eventBusService.subscribe("payment.payment_captured", this.handlePaymentCaptured);
+        eventBusService.subscribe("product.updated", this.handleMedusaProductUpdated);
+        eventBusService.subscribe("product-variant.updated", this.handleMedusaVariantUpdated);
     }
 
     handlePrintfulProductUpdated = async (data: any) => {
         console.log("From handlePrintfulProductUpdated subscriber:", data)
-        const existingProduct = await this.productService.list({external_id: data.id});
 
-        if (existingProduct.length > 0) {
-            await this.productService.update(existingProduct[0].id, {title: data.name, handle: kebabCase(data.name)});
-        } else {
-            console.error(`Product with id ${data.id} not found in Medusa, you might want to sync your products`)
+        const {
+            sync_product: printfulProduct,
+            sync_variants: printfulProductVariants
+        } = await this.printfulService.getSyncProduct(data.data.sync_product.id);
+
+        const listedProducts = await this.productService.list({external_id: printfulProduct.id});
+
+        if (listedProducts.length === 0) {
+            console.log(`Couldn't update product with id ${printfulProduct.id} in Medusa, does it exist? \n ${printfulProduct}`)
+            return;
+        } else if (listedProducts.length > 1) {
+            console.log(`Found multiple products with id ${printfulProduct.id} in Medusa, this shouldn't happen!`)
+            return;
         }
+
+        const updatedProduct = await this.printfulService.updateProduct(listedProducts[0].id, {
+            title: printfulProduct.name,
+            handle: kebabCase(printfulProduct.name),
+            thumbnail: printfulProduct.thumbnail_url,
+            external_id: printfulProduct.id,
+            metadata: {
+                printful_id: printfulProduct.id,
+                printful_synced_at: new Date().toISOString(),
+            }
+        }, "fromPrintful");
+
+        if (updatedProduct) {
+
+
+        }
+
+
     }
 
     handlePrintfulProductDeleted = async (data: any) => {
@@ -85,6 +119,15 @@ class PrintfulSubscriber {
         const order = await this.orderService_.retrieve(orderData.external_id);
 
     }
+
+    handleMedusaProductUpdated = async (data: any) => {
+        console.log("From subscriber - processing handleMedusaProductUpdated: -- NOT YET IMPLEMENTED", data)
+    }
+
+    handleMedusaVariantUpdated = async (data: any) => {
+        console.log("From subscriber - processing handleMedusaVariantUpdated: -- NOT YET IMPLEMENTED", data)
+    }
+
     handleOrderCreated = async (data: any) => {
         console.log("From subscriber - processing following event:", data)
         // TODO: Add logic to create order in printful

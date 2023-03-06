@@ -3,7 +3,6 @@ import bodyParser from "body-parser"
 import {getConfigFile, parseCorsOrigins} from "medusa-core-utils"
 import {ConfigModule} from "@medusajs/medusa/dist/types/global"
 import cors from "cors"
-import authenticate from "@medusajs/medusa/dist/api/middlewares/authenticate"
 
 export default (rootDirectory) => {
     const {configModule} = getConfigFile(rootDirectory, "medusa-config")
@@ -20,13 +19,13 @@ export default (rootDirectory) => {
         credentials: true,
     }
 
-    router.options('/admin/printful/create_webhooks', cors(adminCorsOptions))
-    router.get("/admin/printful/create_webhooks", cors(adminCorsOptions), authenticate(), async (req, res) => {
-        const printfulWebhookService = req.scope.resolve("printfulWebhooksService")
-        res.json({
-            message: await printfulWebhookService.createWebhooks(),
-        })
-    })
+    // router.options('/admin/printful/create_webhooks', cors(adminCorsOptions))
+    // router.get("/admin/printful/create_webhooks", cors(adminCorsOptions), authenticate(), async (req, res) => {
+    //     const printfulWebhookService = req.scope.resolve("printfulWebhooksService")
+    //     res.json({
+    //         message: await printfulWebhookService.createWebhooks(),
+    //     })
+    // })
 
     router.options('/admin/printful/sync', cors(adminCorsOptions))
     router.get("/admin/printful/sync", cors(adminCorsOptions), async (req, res) => {

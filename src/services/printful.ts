@@ -1,4 +1,4 @@
-import {FulfillmentService, OrderService, ProductService, TransactionBaseService} from "@medusajs/medusa"
+import {OrderService, ProductService, TransactionBaseService} from "@medusajs/medusa"
 import {EntityManager} from "typeorm"
 import {PrintfulClient} from "printful-request"
 import {
@@ -7,24 +7,6 @@ import {
     FulFillmentItemType
 } from "@medusajs/medusa/dist/types/fulfillment";
 
-interface ShippingRates {
-    recipient: {
-        address1: string,
-        city: string,
-        country_code: string,
-        state_code?: string,
-        zip?: string
-        phone?: string
-    }
-    items: [
-        {
-            variant_id?: string,
-            external_variant_id?: string,
-            quantity: number,
-            value?: string
-        }
-    ]
-}
 
 interface CalculateTaxRate {
     recipient: {
@@ -45,16 +27,104 @@ class PrintfulService extends TransactionBaseService {
     private readonly storeId: any;
     private readonly printfulAccessToken: any;
     private fulfillmentService: any;
+    private productVariantService: any;
 
     constructor(container, options) {
         super(container);
         this.productService = container.productService;
         this.orderService = container.orderService;
         this.fulfillmentService = container.fulfillmentService;
+        this.productVariantService = container.productVariantService;
         this.printfulClient = new PrintfulClient(options.printfulAccessToken);
         this.storeId = options.storeId;
     }
 
+
+    async getSyncProduct(id: string) {
+        const {
+            result: product,
+            code: code
+        } = await this.printfulClient.get(`store/products/${id}`, {store_id: this.storeId});
+        if (code !== 200) {
+            console.error("Error getting product from Printful: ", product)
+            return null;
+        }
+        return product;
+    }
+
+    async getSyncVariant(id: string) {
+        const {
+            result: variant,
+            code: code
+        } = await this.printfulClient.get(`store/variants/${id}`, {store_id: this.storeId});
+        if (code !== 200) {
+            console.error("Error getting variant from Printful: ", variant)
+            return null;
+        }
+        return variant;
+    }
+
+    async updateProduct(productIdOrExternalId: string, data: any, type: string) {
+
+        if (type === 'fromMedusa') {
+            const {
+                result: product,
+                code: code
+            } = await this.printfulClient.put(`store/products/${productIdOrExternalId}`, data, {store_id: this.storeId});
+            if (code !== 200) {
+                console.error("Error updating product in Printful: ", product)
+                return null;
+            }
+            console.log("Updated product in Printful: ", product)
+            return product;
+        }
+
+        if (type === 'fromPrintful') {
+            const medusaProduct = await this.productService.retrieve(productIdOrExternalId, {relations: ["variants"]});
+            if (medusaProduct) {
+                const updatedProduct = await this.productService.update(productIdOrExternalId, data);
+                if (updatedProduct) {
+                    // TODO: fetch product with newest data for variants again - decide wether its needed or not
+
+                    console.log("Updated product in Medusa: ", updatedProduct)
+
+                    const variantsWithOptions = await Promise.all(medusaProduct.variants.map(async (variant) => {
+                        const {result: {variant: options}} = await this.printfulClient.get(`products/variant/${variant.metadata.printful_id}`);
+                        const toReturn = {
+                            ...variant,
+                            name: `${updatedProduct.title} - ${options.size} / ${options.color}`,
+                            size: options.size,
+                            color: options.color,
+                            color_code: options.color_code,
+                        }
+                        console.log(toReturn)
+                        return toReturn;
+                    }));
+
+                    const updatedVariants = await Promise.all(variantsWithOptions.map(async (variant) => {
+                        console.log("Updating variant: ", variant)
+                        const variantToUpdate = await this.productVariantService.update(variant.id, {
+                            title: variant.name,
+                            metadata: {
+                                printful_id: variant.metadata.printful_id,
+                                color: variant.color,
+                                size: variant.size,
+                                color_code: variant.color_code,
+                            }
+                        })
+                        if (variantToUpdate) {
+                            return variantToUpdate
+                        }
+                    }))
+
+                    console.log(updatedVariants)
+
+                }
+            }
+            return null;
+        }
+        return "Invalid type";
+    }
 
     async getShippingRates(data) {
         const {recipient, items} = data;
@@ -146,15 +216,12 @@ class PrintfulService extends TransactionBaseService {
         const fulfillmentItems = await this.fulfillmentService.getFulfillmentItems_(order, itemsToFulfill);
         console.log("FULFILLMENT ITEMS", fulfillmentItems)
 
-        return;
 
-        const fulfillment = await this.fulfillmentService.createFulfillment(order, itemsToFulfill);
-        return fulfillment;
+        return await this.fulfillmentService.createFulfillment(order, itemsToFulfill);
     }
 
     async createMedusaShipment(fulfillmentId: string, trackingLinks: { tracking_number: string }[], config: CreateShipmentConfig) {
-        const shipment = await this.fulfillmentService.createShipment(fulfillmentId, trackingLinks, config);
-        return shipment;
+        return await this.fulfillmentService.createShipment(fulfillmentId, trackingLinks, config);
     }
 }
 
