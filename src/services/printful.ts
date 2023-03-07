@@ -8,13 +8,6 @@ import {
 } from "@medusajs/medusa/dist/types/fulfillment";
 import {CreateProductInput, UpdateProductInput} from "@medusajs/medusa/dist/types/product";
 import {kebabCase} from "lodash";
-import {
-    ProductVariantOption,
-    ProductVariantPrice,
-    UpdateProductVariantInput
-} from "@medusajs/medusa/dist/types/product-variant";
-import printful from "../subscribers/printful";
-
 
 interface CalculateTaxRate {
     recipient: {
@@ -76,7 +69,18 @@ class PrintfulService extends TransactionBaseService {
         return variant;
     }
 
+    convertToInteger(str) {
+        // replace comma with period
+        let numStr = str.replace(",", ".");
+        // parse the number and round to the nearest integer
+        let num = Math.round(parseFloat(numStr) * 100);
+        return num;
+    }
+
+
     async createProductInMedusa(rawProduct: any) {
+
+
         const defaultShippingProfile = await this.shippingProfileService.retrieveDefault();
         const defaultSalesChannel = await this.salesChannelService.retrieveDefault();
 
@@ -87,12 +91,21 @@ class PrintfulService extends TransactionBaseService {
             }
         } = await this.printfulClient.get(`store/products/${rawProduct.id}`, {store_id: this.storeId});
 
+        // const {result: {variants: productOptions}} = await this.printfulClient.get(`products/${printfulProduct.id}`);
+
+        // filter out options that don't exist or are empty
+        // const options = [
+        //     productOptions.some(v => !!v.size) ? {title: "size"} : null,
+        //     productOptions.some(v => !!v.color) ? {title: "color"} : null,
+        // ].filter(Boolean);
+        
         const images = printfulProductVariant.flatMap(variant => (
             variant.files
                 .filter(file => file.type === 'preview')
                 .map(file => file.preview_url)
-        )).filter((url, index, arr) => arr.indexOf(url) === index);
+        )).filter((url, index, arr) => arr.indexOf(url) === index && url !== null && url !== '');
 
+        console.log("images", images)
         const productObj: CreateProductInput = {
             title: printfulProduct.name,
             handle: kebabCase(printfulProduct.name),
@@ -101,26 +114,28 @@ class PrintfulService extends TransactionBaseService {
             profile_id: defaultShippingProfile.id,
             external_id: printfulProduct.id,
             sales_channels: [{id: defaultSalesChannel.id}],
-            images: images,
             metadata: {
                 printful_id: printfulProduct.id
             }
+        };
+
+        if (images.length > 0) {
+            productObj.images = images
         }
 
 
         const productVariantsObj = await Promise.all(printfulProductVariant.map(async (variant) => {
-
             const {result: {variant: option}} = await this.printfulClient.get(`products/variant/${variant.variant_id}`);
 
             return {
-                title: `${productObj.title} - ${option.size} / ${option.color}`,
+                title: productObj.title + (option.size ? ` - ${option.size}` : '') + (option.color ? ` / ${option.color}` : ''),
                 sku: variant.sku,
                 external_id: variant.id,
                 manage_inventory: false,
                 allow_backorder: true,
                 inventory_quantity: 100,
                 prices: [{
-                    amount: parseFloat(variant.retail_price) * 100,
+                    amount: this.convertToInteger(variant.retail_price),
                     currency_code: variant.currency.toLowerCase()
                 }],
                 metadata: {
@@ -131,7 +146,6 @@ class PrintfulService extends TransactionBaseService {
                 }
             }
         }))
-
         const productToPush = {
             ...productObj,
             variants: productVariantsObj,
@@ -149,12 +163,14 @@ class PrintfulService extends TransactionBaseService {
                     for (const variant of variants) {
                         if (option.title === 'size' || option.title === 'color') {
                             const value = variant.metadata[option.title];
-                            // console.log(`Variant ${variant.id}: option ${option.title} = ${value}`);
+                            console.log(`Variant ${variant.id}: option ${option.title} = ${value} ℹ️`);
                             // if (value !== undefined && option.values && value !== option.values[0].value) {
-                            // console.log(`Updating variant ${variant.id} option ${option.id} to ${value}`);
-                            const addedOption = await this.productVariantService.addOptionValue(variant.id, option.id, value);
-                            if (addedOption) {
-                                console.log(`Updated variant ${variant.id} option ${option.id} to ${value}! ✅`);
+                            if (value !== null) {
+                                console.log(`Updating variant ${variant.id} option ${option.id} to ${value}.. ⚙️`);
+                                const addedOption = await this.productVariantService.addOptionValue(variant.id, option.id, value);
+                                if (addedOption) {
+                                    console.log(`Updated variant ${variant.id} option ${option.id} to ${value}! ✅`);
+                                }
                             }
                             // }
                         }
@@ -191,10 +207,11 @@ class PrintfulService extends TransactionBaseService {
             } = await this.printfulClient.get(`store/products/${rawProduct.id}`, {store_id: this.storeId});
 
 
-            const medusaProduct = await this.productService.retrieveByExternalId(printfulProduct.id, {relations: ["variants", "options"]});
+            let medusaProduct = await this.productService.retrieveByExternalId(printfulProduct.id, {relations: ["variants", "options"]});
 
             const variantToDelete = medusaProduct.variants.filter(v => !printfulProductVariant.find(pv => pv.id === v.metadata.printful_id));
 
+            // remove variants that are not in printful
             if (variantToDelete.length > 0) {
                 console.log("Deleting variants unsynced with Printful...🚮")
                 await Promise.all(variantToDelete.map(async (variant) => {
@@ -202,6 +219,9 @@ class PrintfulService extends TransactionBaseService {
                         console.log(`Deleted variant ${variant.id}! ✅`)
                     })
                 }))
+                console.log("Deleted variants unsynced with Printful! ✅ \n Refetching main product...⚙️")
+                medusaProduct = await this.productService.retrieveByExternalId(printfulProduct.id, {relations: ["variants", "options"]});
+
             }
 
             const images = printfulProductVariant.flatMap(variant => (
@@ -224,26 +244,28 @@ class PrintfulService extends TransactionBaseService {
             const productVariantsObj = await Promise.all(printfulProductVariant.map(async (variant) => {
                 const {result: {variant: option}} = await this.printfulClient.get(`products/variant/${variant.variant_id}`);
 
-                const medusaVariant = await this.productVariantService.list({sku: variant.sku})
-                if (medusaVariant.length === 1 && medusaVariant[0].id !== undefined) {
-
+                // check if variant exists in Medusa
+                const medusaVariant = medusaProduct.variants.find(v => v.metadata.printful_id === variant.id);
+                if (medusaVariant !== undefined) {
                     return {
-                        title: `${productObj.title} - ${option.size} / ${option.color}`,
+                        title: productObj.title + (option.size ? ` - ${option.size}` : '') + (option.color ? ` / ${option.color}` : ''),
                         sku: variant.sku,
                         external_id: variant.id,
                         prices: [{
-                            amount: parseFloat(variant.retail_price) * 100,
+                            amount: this.convertToInteger(variant.retail_price),
                             currency_code: variant.currency.toLowerCase()
                         }],
                         metadata: {
-                            medusa_id: medusaVariant[0].id,
+                            medusa_id: medusaVariant.id,
                             printful_id: variant.id,
                             size: option.size,
                             color: option.color,
                             color_code: option.color_code
                         }
                     }
-                } else if (medusaVariant.length === 0) {
+
+                } else {
+                    console.log(`Variant with SKU '${variant.sku}' not found in Medusa! Attempting to create...`)
                     const newVariant = await this.productVariantService.create(medusaProduct.id, {
                         title: `${productObj.title} - ${option.size} / ${option.color}`,
                         sku: variant.sku,
@@ -263,7 +285,7 @@ class PrintfulService extends TransactionBaseService {
                             }
                         ],
                         prices: [{
-                            amount: parseFloat(variant.retail_price) * 100,
+                            amount: this.convertToInteger(variant.retail_price),
                             currency_code: variant.currency.toLowerCase()
                         }],
                         metadata: {
@@ -275,12 +297,11 @@ class PrintfulService extends TransactionBaseService {
 
                     })
                     if (newVariant) {
-
+                        await this.productVariantService.update(newVariant.id, {metadata: {medusa_id: newVariant.id}});
                         console.log(`Successfully created variant ${newVariant.id} for product ${medusaProduct.id}! 🎉`)
                     }
-                } else {
-                    console.error(`Found more than one variant with external_id ${variant.id}!`)
                 }
+
 
             }))
 
@@ -312,11 +333,13 @@ class PrintfulService extends TransactionBaseService {
                             for (const variant of variants) {
                                 if (option.title === 'size' || option.title === 'color') {
                                     const value = variant.metadata[option.title];
-                                    const addedOption = await this.productVariantService.updateOptionValue(variant.id, option.id, value);
-                                    if (addedOption) {
-                                        console.log(`Updated variant ${variant.id} option ${option.id} to ${value}! ✅`);
+                                    if (value !== null) {
+
+                                        const addedOption = await this.productVariantService.updateOptionValue(variant.id, option.id, value);
+                                        if (addedOption) {
+                                            console.log(`Updated variant ${variant.id} option ${option.id} to ${value}! ✅`);
+                                        }
                                     }
-                                    // }
                                 }
                             }
                         }
@@ -341,9 +364,9 @@ class PrintfulService extends TransactionBaseService {
     async deleteProduct(productOrProductId: string) {
         try {
             await this.productService.delete(productOrProductId);
-            console.log(`Successfully deleted product ${productOrProductId} in Medusa`)
+            console.log(`Successfully deleted product ${productOrProductId} in Medusa 🪦`)
         } catch (e) {
-            console.log(`Failed to delete product ${productOrProductId} in Medusa`)
+            console.log(`Failed to delete product ${productOrProductId} in Medusa 🙇‍♂️`)
         }
     }
 

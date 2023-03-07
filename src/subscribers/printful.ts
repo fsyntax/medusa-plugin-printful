@@ -77,12 +77,14 @@ class PrintfulSubscriber {
 
     handlePrintfulProductDeleted = async (data: any) => {
         console.log("From subscriber - processing following event:", data)
-        const existingProduct = await this.productService.list({external_id: data.data.sync_product.id});
-        if (existingProduct.length === 0) {
-            console.log(`Couldn't delete product with id ${data.data.sync_product.id} in Medusa, it does not exist`)
+        const existingProduct = await this.productService.retrieveByExternalId(data.data.sync_product.id);
+        if (!existingProduct) {
+            console.log(`Failed to delete product ${data.data.sync_product.name} in Medusa 🙇‍♂️`)
             return;
         }
         await this.productService.delete(existingProduct.id)
+        console.log(`Successfully deleted product ${existingProduct.id} in Medusa 🪦`)
+
 
     }
 
