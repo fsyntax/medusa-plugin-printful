@@ -96,6 +96,9 @@ class PrintfulSyncService extends TransactionBaseService {
     }
 
     async createPrintfulRegions() {
+
+        console.log("You've triggered the createPrintfulRegions function! Preparing to create regions.. 🗺️")
+
         const printfulCountries = await this.printfulService.getCountryList();
         let nestedCountries = {};
         printfulCountries.forEach(country => {
@@ -106,6 +109,18 @@ class PrintfulSyncService extends TransactionBaseService {
             }
         });
 
+        console.log(`Fetched ${printfulCountries.length} available countries from Printful! ✅`)
+
+        const existingRegions = await this.regionService.list();
+        console.info(`Found ${existingRegions.length} existing regions in Medusa! Preparing to delete them.. 🚮`)
+        if (existingRegions.length > 0) {
+            await Promise.all(existingRegions.map(async region => {
+                await this.regionService.delete(region.id);
+                console.log(`Deleted region ${region.name}! ✅`)
+            }))
+        }
+
+        console.log("Creating new regions.. ⚙️")
         const createdRegions = await Promise.all(
             Object.keys(nestedCountries).map(async regionName => {
                 const regionData = {
@@ -116,14 +131,15 @@ class PrintfulSyncService extends TransactionBaseService {
                     fulfillment_providers: ["printful"],
                     countries: nestedCountries[regionName].map(country => country.code),
                 };
-                // exclude 'AN' from countries - since it doens't exist in anymore
+                // exclude 'AN' from countries - since it doesn't exist anymore
                 if (regionData.countries.includes('AN')) {
                     regionData.countries = regionData.countries.filter(country => country !== 'AN');
                 }
-                console.log(regionData)
+                console.log(`Creating region ${regionData.name} with ${regionData.countries.length} countries.. ⚙️`, regionData)
                 return await this.regionService.create(regionData);
             })
         );
+        console.log("Successfully created all regions available from Printful! ✅")
         return {printfulCountries, createdRegions};
     }
 
