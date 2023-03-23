@@ -128,11 +128,10 @@ class PrintfulSubscriber {
     }
 
     handleOrderCreated = async (data: any) => {
-        console.log("From subscriber - processing following event:", data)
-        // TODO: Add logic to create order in printful
+        console.log("From handleOrderCreated - processing following event:", data)
         const order = await this.orderService_.retrieve(data.id);
         if (order) {
-            await this.printfulFulfillmentService.createOrder(order)
+            await this.printfulFulfillmentService.createPrintfulOrder(order)
         }
     }
 

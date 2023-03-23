@@ -19,6 +19,7 @@ class PrintfulSyncService extends TransactionBaseService {
     private regionService: any;
     private printfulService: any;
     private printfulWebhooksService: any;
+    private batchSize: number;
 
     constructor(container, options) {
         super(container);
@@ -33,7 +34,7 @@ class PrintfulSyncService extends TransactionBaseService {
         this.storeId = options.storeId;
         this.enableSync = options.enableSync;
         this.printfulWebhooksService = container.printfulWebhooksService;
-
+        this.batchSize = options.batchSize || 5;
         if (this.enableSync) {
             setTimeout(async () => {
                 await this.syncPrintfulProducts()
@@ -53,18 +54,49 @@ class PrintfulSyncService extends TransactionBaseService {
 
     async syncPrintfulProducts() {
         console.info("Heya! Starting to sync products from Printful! 👀")
-        const {result: syncableProducts} = await this.printfulClient.get("store/products", {store_id: this.storeId});
 
-        for (let product of syncableProducts) {
-            const existingProduct = await this.checkIfProductExists(product.id.toString());
-            if (existingProduct) {
-                console.log(`Product ${existingProduct.title} already exists in Medusa! Preparing to update.. 🚧`)
-                await this.printfulService.updateProduct(product, "fromPrintful", null);
-            } else {
-                console.log(`Product ${product.name} does not exist in Medusa! Preparing to create.. ⚙️`)
-                await this.printfulService.createProductInMedusa(product);
+        const {result: syncableProducts} = await this.printfulClient.get("store/products", {store_id: this.storeId});
+        const batchSize = 10;
+        const delay = 60000 / 120; // 1 minute / 120 calls per minute
+
+        for (let i = 0; i < syncableProducts.length; i += batchSize) {
+            const batch = syncableProducts.slice(i, i + batchSize);
+
+            await Promise.all(batch.map(async product => {
+
+
+                console.log("product", product)
+                const existingProduct = await this.checkIfProductExists(product.id.toString());
+                const {result: printfulStoreProduct} = await this.printfulClient.get(`store/products/${product.id}`, {store_id: this.storeId});
+
+
+                if (existingProduct) {
+                    console.log(`Product ${existingProduct.title} already exists in Medusa! Preparing to update.. 🚧`)
+                    await this.printfulService.updateProduct(printfulStoreProduct, "fromPrintful", null);
+                } else {
+                    console.log(`Product ${product.name} does not exist in Medusa! Preparing to create.. ⚙️`)
+                    await this.printfulService.createProductInMedusa(printfulStoreProduct);
+                }
+
+            }));
+
+            if (i + batchSize < syncableProducts.length) {
+                await new Promise(resolve => setTimeout(resolve, delay));
             }
         }
+
+
+        // await Promise.all(syncableProducts.map(async product => {
+        //     const existingProduct = await this.checkIfProductExists(product.id.toString());
+        //     if (existingProduct) {
+        //         console.log(`Product ${existingProduct.title} already exists in Medusa! Preparing to update.. 🚧`)
+        //         await this.printfulService.updateProduct(product, "fromPrintful", null);
+        //     } else {
+        //         console.log(`Product ${product.name} does not exist in Medusa! Preparing to create.. ⚙️`)
+        //         await this.printfulService.createProductInMedusa(product);
+        //     }
+        // }))
+
         return "Syncing done!"
     }
 

@@ -85,11 +85,10 @@ class PrintfulService extends TransactionBaseService {
         const defaultSalesChannel = await this.salesChannelService.retrieveDefault();
 
         const {
-            result: {
-                sync_product: printfulProduct,
-                sync_variants: printfulProductVariant
-            }
-        } = await this.printfulClient.get(`store/products/${rawProduct.id}`, {store_id: this.storeId});
+            sync_product: printfulProduct,
+            sync_variants: printfulProductVariant
+
+        } = rawProduct;
 
         // const {result: {variants: productOptions}} = await this.printfulClient.get(`products/${printfulProduct.id}`);
 
@@ -98,14 +97,13 @@ class PrintfulService extends TransactionBaseService {
         //     productOptions.some(v => !!v.size) ? {title: "size"} : null,
         //     productOptions.some(v => !!v.color) ? {title: "color"} : null,
         // ].filter(Boolean);
-        
+
         const images = printfulProductVariant.flatMap(variant => (
             variant.files
                 .filter(file => file.type === 'preview')
                 .map(file => file.preview_url)
         )).filter((url, index, arr) => arr.indexOf(url) === index && url !== null && url !== '');
 
-        console.log("images", images)
         const productObj: CreateProductInput = {
             title: printfulProduct.name,
             handle: kebabCase(printfulProduct.name),
@@ -127,6 +125,8 @@ class PrintfulService extends TransactionBaseService {
         const productVariantsObj = await Promise.all(printfulProductVariant.map(async (variant) => {
             const {result: {variant: option}} = await this.printfulClient.get(`products/variant/${variant.variant_id}`);
 
+            const productSizeGuide = await this.getProductSizeGuide(variant.product.product_id);
+
             return {
                 title: productObj.title + (option.size ? ` - ${option.size}` : '') + (option.color ? ` / ${option.color}` : ''),
                 sku: variant.sku,
@@ -142,7 +142,8 @@ class PrintfulService extends TransactionBaseService {
                     printful_id: variant.id,
                     size: option.size,
                     color: option.color,
-                    color_code: option.color_code
+                    color_code: option.color_code,
+                    ...productSizeGuide
                 }
             }
         }))
@@ -200,11 +201,10 @@ class PrintfulService extends TransactionBaseService {
 
         if (type === 'fromPrintful') {
             const {
-                result: {
-                    sync_product: printfulProduct,
-                    sync_variants: printfulProductVariant
-                }
-            } = await this.printfulClient.get(`store/products/${rawProduct.id}`, {store_id: this.storeId});
+                sync_product: printfulProduct,
+                sync_variants: printfulProductVariant
+
+            } = rawProduct;
 
 
             let medusaProduct = await this.productService.retrieveByExternalId(printfulProduct.id, {relations: ["variants", "options"]});
@@ -238,11 +238,13 @@ class PrintfulService extends TransactionBaseService {
                 external_id: printfulProduct.id,
                 images: images,
                 metadata: {
-                    printful_id: printfulProduct.id
+                    printful_id: printfulProduct.id,
                 }
             }
             const productVariantsObj = await Promise.all(printfulProductVariant.map(async (variant) => {
                 const {result: {variant: option}} = await this.printfulClient.get(`products/variant/${variant.variant_id}`);
+
+                const productSizeGuide = await this.getProductSizeGuide(variant.product.product_id);
 
                 // check if variant exists in Medusa
                 const medusaVariant = medusaProduct.variants.find(v => v.metadata.printful_id === variant.id);
@@ -260,7 +262,8 @@ class PrintfulService extends TransactionBaseService {
                             printful_id: variant.id,
                             size: option.size,
                             color: option.color,
-                            color_code: option.color_code
+                            color_code: option.color_code,
+                            ...productSizeGuide
                         }
                     }
 
@@ -361,6 +364,17 @@ class PrintfulService extends TransactionBaseService {
         return "Could not update product";
     }
 
+    async getProductSizeGuide(printfulProductId) {
+        try {
+            const {result, code} = await this.printfulClient.get(`products/${printfulProductId}/sizes`, {unit: 'cm'});
+            if (code === 200) {
+                return result;
+            }
+        } catch (e: any) {
+            console.log(e)
+        }
+    }
+
     async deleteProduct(productOrProductId: string) {
         try {
             await this.productService.delete(productOrProductId);
@@ -403,7 +417,8 @@ class PrintfulService extends TransactionBaseService {
         return orderCosts;
     }
 
-    async createOrder(data: any) {
+    async createPrintfulOrder(data: any) {
+        console.log("Preparing order data for Printful... 📦")
         const orderObj = {
             external_id: data.id,
             recipient: {
@@ -426,13 +441,14 @@ class PrintfulService extends TransactionBaseService {
             })
         }
         try {
+            console.log("Sending order to Printful with the following data... ➡️", orderObj)
             const order = await this.printfulClient.post("orders", {orderObj}, {
                 store_id: this.storeId,
                 confirm: false // dont skip draft phase
             });
             if (order.code === 200) {
                 // TODO: Send confirmation email to customer
-                console.log("Order created: ", order.result)
+                console.log("Order successfully sent to Printful! 📬🥳: ", order.result)
             }
 
 
