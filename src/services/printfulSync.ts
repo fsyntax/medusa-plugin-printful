@@ -57,18 +57,16 @@ class PrintfulSyncService extends TransactionBaseService {
 
         const {result: syncableProducts} = await this.printfulClient.get("store/products", {store_id: this.storeId});
         const batchSize = 10;
-        const delay = 60000 / 120; // 1 minute / 120 calls per minute
+        const delay = 60000 / 5; // 1 minute / 5 calls per minute
 
         for (let i = 0; i < syncableProducts.length; i += batchSize) {
             const batch = syncableProducts.slice(i, i + batchSize);
-
             await Promise.all(batch.map(async product => {
 
-
                 console.log("product", product)
+
                 const existingProduct = await this.checkIfProductExists(product.id.toString());
                 const {result: printfulStoreProduct} = await this.printfulClient.get(`store/products/${product.id}`, {store_id: this.storeId});
-
 
                 if (existingProduct) {
                     console.log(`Product ${existingProduct.title} already exists in Medusa! Preparing to update.. 🚧`)
@@ -84,19 +82,6 @@ class PrintfulSyncService extends TransactionBaseService {
                 await new Promise(resolve => setTimeout(resolve, delay));
             }
         }
-
-
-        // await Promise.all(syncableProducts.map(async product => {
-        //     const existingProduct = await this.checkIfProductExists(product.id.toString());
-        //     if (existingProduct) {
-        //         console.log(`Product ${existingProduct.title} already exists in Medusa! Preparing to update.. 🚧`)
-        //         await this.printfulService.updateProduct(product, "fromPrintful", null);
-        //     } else {
-        //         console.log(`Product ${product.name} does not exist in Medusa! Preparing to create.. ⚙️`)
-        //         await this.printfulService.createProductInMedusa(product);
-        //     }
-        // }))
-
         return "Syncing done!"
     }
 
@@ -177,6 +162,7 @@ class PrintfulSyncService extends TransactionBaseService {
 
 
     async checkIfProductExists(id: string) {
+        console.log(id)
         try {
             const product = await this.productService.retrieveByExternalId(id, {relations: ['variants']});
             if (product) {

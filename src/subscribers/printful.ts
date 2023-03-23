@@ -44,33 +44,38 @@ class PrintfulSubscriber {
     handlePrintfulProductUpdated = async (data: any) => {
         console.log("From handlePrintfulProductUpdated subscriber:", data)
 
-        const {
-            sync_product: printfulProduct,
-            sync_variants: printfulProductVariants
-        } = await this.printfulService.getSyncProduct(data.data.sync_product.id);
+        try {
+            const {
+                sync_product: printfulProduct,
+                sync_variants: printfulProductVariants
+            } = await this.printfulService.getSyncProduct(data.data.sync_product.id);
 
-        const listedProducts = await this.productService.list({external_id: printfulProduct.id});
+            const listedProducts = await this.productService.list({external_id: printfulProduct.id});
+            if (listedProducts.length === 1) {
+                const updated = await this.printfulService.updateProduct({
+                    sync_product: printfulProduct,
+                    sync_variants: printfulProductVariants
+                }, "fromPrintful", null);
+                return updated;
+            } else if (listedProducts.length > 1) {
+                console.log(`Found multiple products with id ${printfulProduct.id} in Medusa, this shouldn't happen!`)
+                return false;
+            } else if (listedProducts.length === 0) {
+                console.log(`Couldn't update product with id ${printfulProduct.id} in Medusa, does it exist yet? Attempting to create it! \n`)
+                try {
+                    const created = await this.printfulService.createProductInMedusa({
+                        sync_product: printfulProduct,
+                        sync_variants: printfulProductVariants
+                    })
+                    return created;
+                } catch (e) {
+                    console.log("Error creating product in Medusa", e)
+                }
 
-        if (listedProducts.length === 0) {
-            console.log(`Couldn't update product with id ${printfulProduct.id} in Medusa, does it exist yet? Attempting to create it! \n`)
-            try {
-                await this.printfulService.createProductInMedusa({
-                    ...printfulProduct,
-                    variants: printfulProductVariants
-                })
-            } catch (e) {
-                console.log("Error creating product in Medusa", e)
             }
-            return;
-        } else if (listedProducts.length > 1) {
-            console.log(`Found multiple products with id ${printfulProduct.id} in Medusa, this shouldn't happen!`)
-            return;
+        } catch (e: any) {
+            console.log("Error updating product in Medusa", e)
         }
-
-        await this.printfulService.updateProduct({
-            ...printfulProduct,
-            variants: printfulProductVariants
-        }, "fromPrintful", null);
 
 
     }

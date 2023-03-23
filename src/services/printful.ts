@@ -46,15 +46,17 @@ class PrintfulService extends TransactionBaseService {
 
 
     async getSyncProduct(id: string) {
+
         const {
-            result: product,
-            code: code
+            result: printfulStoreProduct,
+            code
         } = await this.printfulClient.get(`store/products/${id}`, {store_id: this.storeId});
+
         if (code !== 200) {
-            console.error("Error getting product from Printful: ", product)
+            console.error("Error getting product from Printful: ", printfulStoreProduct)
             return null;
         }
-        return product;
+        return printfulStoreProduct;
     }
 
     async getSyncVariant(id: string) {
@@ -200,15 +202,15 @@ class PrintfulService extends TransactionBaseService {
 
 
         if (type === 'fromPrintful') {
+
             const {
                 sync_product: printfulProduct,
                 sync_variants: printfulProductVariant
 
             } = rawProduct;
 
-
             let medusaProduct = await this.productService.retrieveByExternalId(printfulProduct.id, {relations: ["variants", "options"]});
-
+            console.log(printfulProductVariant)
             const variantToDelete = medusaProduct.variants.filter(v => !printfulProductVariant.find(pv => pv.id === v.metadata.printful_id));
 
             // remove variants that are not in printful
@@ -248,6 +250,7 @@ class PrintfulService extends TransactionBaseService {
 
                 // check if variant exists in Medusa
                 const medusaVariant = medusaProduct.variants.find(v => v.metadata.printful_id === variant.id);
+
                 if (medusaVariant !== undefined) {
                     return {
                         title: productObj.title + (option.size ? ` - ${option.size}` : '') + (option.color ? ` / ${option.color}` : ''),
@@ -365,6 +368,7 @@ class PrintfulService extends TransactionBaseService {
     }
 
     async getProductSizeGuide(printfulProductId) {
+        console.log("Trying to get size guide for product: ", printfulProductId)
         try {
             const {result, code} = await this.printfulClient.get(`products/${printfulProductId}/sizes`, {unit: 'cm'});
             if (code === 200) {
