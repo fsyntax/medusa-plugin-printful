@@ -56,11 +56,11 @@ class PrintfulSyncService extends TransactionBaseService {
         console.info("Heya! Starting to sync products from Printful! 👀")
 
         const {result: syncableProducts} = await this.printfulClient.get("store/products", {store_id: this.storeId});
-        const batchSize = 10;
+
         const delay = 60000 / 5; // 1 minute / 5 calls per minute
 
-        for (let i = 0; i < syncableProducts.length; i += batchSize) {
-            const batch = syncableProducts.slice(i, i + batchSize);
+        for (let i = 0; i < syncableProducts.length; i += this.batchSize) {
+            const batch = syncableProducts.slice(i, i + this.batchSize);
             await Promise.all(batch.map(async product => {
 
                 console.log("product", product)
@@ -78,7 +78,7 @@ class PrintfulSyncService extends TransactionBaseService {
 
             }));
 
-            if (i + batchSize < syncableProducts.length) {
+            if (i + this.batchSize < syncableProducts.length) {
                 await new Promise(resolve => setTimeout(resolve, delay));
             }
         }

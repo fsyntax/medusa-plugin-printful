@@ -142,6 +142,7 @@ class PrintfulService extends TransactionBaseService {
                 }],
                 metadata: {
                     printful_id: variant.id,
+                    printful_catalog_variant_id: variant.variant_id,
                     size: option.size,
                     color: option.color,
                     color_code: option.color_code,
@@ -263,6 +264,7 @@ class PrintfulService extends TransactionBaseService {
                         metadata: {
                             medusa_id: medusaVariant.id,
                             printful_id: variant.id,
+                            printful_catalog_variant_id: variant.variant_id,
                             size: option.size,
                             color: option.color,
                             color_code: option.color_code,
@@ -389,12 +391,20 @@ class PrintfulService extends TransactionBaseService {
     }
 
     async getShippingRates(data) {
+        console.log("Trying to get shipping rates for: ", data)
         const {recipient, items} = data;
-        const {result: shippingRates} = await this.printfulClient.post("shipping/rates", {
-            recipient,
-            items
-        }, {store_id: this.storeId});
-        return shippingRates.result;
+        try {
+            const shippingRates = await this.printfulClient.post("shipping/rates", {
+                recipient,
+                items,
+                store_id: this.storeId
+            });
+            console.log(shippingRates)
+            return shippingRates;
+        } catch (e) {
+            console.log(e)
+            return 0
+        }
     }
 
     async getCountryList() {

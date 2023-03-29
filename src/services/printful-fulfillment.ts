@@ -10,7 +10,7 @@ class PrintfulFulfillmentService extends FulfillmentService {
     private printfulService: any;
     private printfulClient: any;
     private fulfillmentService: any;
-    private storeId: any;
+    private readonly storeId: any;
 
     constructor(container, options) {
         super();
@@ -25,8 +25,12 @@ class PrintfulFulfillmentService extends FulfillmentService {
         console.log("About to create fulfillment options")
         return [
             {
-                id: "printful-default",
+                id: "STANDARD",
                 name: "Printful Default"
+            },
+            {
+                id: "PRINTFUL_FAST",
+                name: "Printful Express"
             },
             {
                 id: "printful-return",
@@ -38,9 +42,7 @@ class PrintfulFulfillmentService extends FulfillmentService {
 
     async validateOption(data) {
         console.log("validateOption", data)
-        if (data.id === "printful-default") {
-            return true;
-        }
+        return true;
     }
 
     async validateFulfillmentData(optionData, data, cart) {
@@ -49,28 +51,50 @@ class PrintfulFulfillmentService extends FulfillmentService {
         return {...data};
     }
 
-    // async createFulfillment(methodData, fulfillmentItems, fromOrder, fulfillment) {
     async createFulfillment(data, fulfillmentItems, fromOrder, fulfillment) {
-        // No data is being sent anywhere
         return Promise.resolve({})
     }
 
     canCalculate(data) {
-        // TODO: implement flat rate or calculate shipping
-        return data.id === "printful-default";
+        if (data.id === "STANDARD" || data.id === "PRINTFUL_FAST") {
+            return true
+        }
     }
 
+
     async calculatePrice(optionData, data, cart) {
-        // TODO: call printful api to get shipping rates
-        // const rate = await this.printfulClient.getShippingRates({
-        //     recipient: {
-        //         address1: cart.shipping_address.address_1,
-        //         city: cart.shipping_address.city,
-        //         country_code: toUpper(cart.shipping_address.country_code),
-        //     }
-        // })
-        console.log("calculatePrice", optionData, data, cart)
-        return cart.items.length * 1000
+        console.log("calculatePrice: ", optionData, data)
+        try {
+            const {code, result} = await this.printfulService.getShippingRates({
+                recipient: {
+                    address1: cart.shipping_address.address_1,
+                    city: cart.shipping_address.city,
+                    country_code: toUpper(cart.shipping_address.country_code),
+                    zip: cart.shipping_address.postal_code,
+                    phone: cart.shipping_address.phone || null,
+                },
+                items: cart.items.map(item => {
+                    return {
+                        variant_id: item.variant.metadata.printful_catalog_variant_id,
+                        quantity: item.quantity
+                    }
+                }),
+                locale: "de_DE"
+            })
+            if (code === 200) {
+                // return the rate where optionData.id is the same as the id of the result
+                const shippingOption = result.find(option => option.id === optionData.id);
+                if (shippingOption) {
+                    return shippingOption.rate;
+                } else {
+                    throw new Error(`Shipping option ${optionData.id} not found`);
+                }
+
+            }
+
+        } catch (e) {
+            console.log(e)
+        }
     }
 
     async cancelFulfillment(fulfillment) {
