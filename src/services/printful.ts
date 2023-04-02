@@ -1,6 +1,6 @@
 import {OrderService, ProductService, TransactionBaseService} from "@medusajs/medusa"
 import {EntityManager} from "typeorm"
-import {PrintfulClient} from "printful-request"
+import {PrintfulClient} from "../utils/printful-request"
 import {
     CreateFulfillmentOrder,
     CreateShipmentConfig,
@@ -31,6 +31,7 @@ class PrintfulService extends TransactionBaseService {
     private productVariantService: any;
     private salesChannelService: any;
     private shippingProfileService: any;
+    private apiKey: any;
 
     constructor(container, options) {
         super(container);
@@ -42,6 +43,7 @@ class PrintfulService extends TransactionBaseService {
         this.shippingProfileService = container.shippingProfileService;
         this.salesChannelService = container.salesChannelService;
         this.storeId = options.storeId;
+        this.apiKey = options.printfulAccessToken;
     }
 
 
@@ -432,40 +434,62 @@ class PrintfulService extends TransactionBaseService {
     }
 
     async createPrintfulOrder(data: any) {
-        console.log("Preparing order data for Printful... 📦")
+        console.log("Preparing order data for Printful..: ", data)
+        console.log(data.items[0].variant)
+        console.log("shipping method", data.shipping_methods[0].shipping_option)
         const orderObj = {
             external_id: data.id,
+            shipping: data.shipping_methods[0].shipping_option.data.id,
             recipient: {
                 name: data.shipping_address.first_name + " " + data.shipping_address.last_name,
                 address1: data.shipping_address.address_1,
                 address2: data.shipping_address.address_2,
                 city: data.shipping_address.city,
                 state_code: data.shipping_address.province,
-                country_code: data.shipping_address.country,
-                zip: data.shipping_address.zip,
-                email: data.email
+                country_code: data.shipping_address.country_code,
+                zip: data.shipping_address.postal_code,
+                email: data.email,
+                phone: data.shipping_address.phone
             },
             items: data.items.map((item) => {
                 return {
-                    id: item.external_id,
-                    variant_id: item.variant.id,
+                    name: item.variant.title,
+                    external_id: item.id,
+                    variant_id: item.variant.metadata.printful_catalog_variant_id,
+                    sync_variant_id: item.variant.metadata.printful_id,
                     quantity: item.quantity,
-                    price: item.total,
+                    price: `${(item.unit_price / 100).toFixed(2)}`.replace('.', '.'),
+                    retail_price: `${(item.unit_price / 100).toFixed(2)}`.replace('.', '.'),
                 }
             })
         }
         try {
             console.log("Sending order to Printful with the following data... ➡️", orderObj)
-            const order = await this.printfulClient.post("orders", {orderObj}, {
+            const order = await this.printfulClient.post("orders", {
+                ...orderObj,
                 store_id: this.storeId,
-                confirm: false // dont skip draft phase
+                confirm: false
             });
             if (order.code === 200) {
-                // TODO: Send confirmation email to customer
                 console.log("Order successfully sent to Printful! 📬🥳: ", order.result)
             }
+        } catch (e) {
+            console.log(e)
+        }
+    }
 
+    async cancelOrder(orderId: string | number) {
+        try {
+            console.log("store id", this.storeId)
+            const {result, code} = await this.printfulClient.delete(`orders/@${orderId}`, {store_id: this.storeId});
 
+            if (code === 200) {
+                console.log("Order has been canceled on Printful!", result)
+                return result;
+            } else {
+                console.log("Order was not canceled on Printful!", result)
+                return result;
+            }
         } catch (e) {
             console.log(e)
         }

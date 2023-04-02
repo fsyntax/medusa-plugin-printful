@@ -1,5 +1,5 @@
 import {FulfillmentService} from "medusa-interfaces";
-import {PrintfulClient} from "printful-request"
+import {PrintfulClient} from "../utils/printful-request"
 import {Fulfillment} from "@medusajs/medusa";
 import {toUpper} from "lodash";
 
@@ -52,6 +52,7 @@ class PrintfulFulfillmentService extends FulfillmentService {
     }
 
     async createFulfillment(data, fulfillmentItems, fromOrder, fulfillment) {
+        console.log("createFulfillment", data, fulfillmentItems, fromOrder, fulfillment)
         return Promise.resolve({})
     }
 
@@ -85,9 +86,10 @@ class PrintfulFulfillmentService extends FulfillmentService {
                 // return the rate where optionData.id is the same as the id of the result
                 const shippingOption = result.find(option => option.id === optionData.id);
                 if (shippingOption) {
-                    return shippingOption.rate;
+                    return parseInt((shippingOption.rate * 100).toString(), 10);
                 } else {
-                    throw new Error(`Shipping option ${optionData.id} not found`);
+
+                    console.log(`Shipping option ${optionData.id} not found`);
                 }
 
             }

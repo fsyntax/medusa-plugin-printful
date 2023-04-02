@@ -1,4 +1,4 @@
-import {kebabCase} from "lodash";
+import {FulFillmentItemType} from "@medusajs/medusa/dist/types/fulfillment";
 
 
 class PrintfulSubscriber {
@@ -9,6 +9,7 @@ class PrintfulSubscriber {
     private fulfillmentService: any;
     private printfulService: any;
     private productVariantService: any;
+    private paymentService: any;
 
     constructor({
                     eventBusService,
@@ -18,7 +19,8 @@ class PrintfulSubscriber {
                     printfulFulfillmentService,
                     fulfillmentService,
                     printfulService,
-                    productVariantService
+                    productVariantService,
+                    paymentService
                 }) {
         this.printfulSyncService = printfulSyncService;
         this.productService = productService
@@ -27,16 +29,20 @@ class PrintfulSubscriber {
         this.fulfillmentService = fulfillmentService;
         this.printfulService = printfulService;
         this.productVariantService = productVariantService;
+        this.paymentService = paymentService;
 
         eventBusService.subscribe("printful.product_updated", this.handlePrintfulProductUpdated);
         eventBusService.subscribe("printful.product_deleted", this.handlePrintfulProductDeleted);
         eventBusService.subscribe("printful.order_updated", this.handlePrintfulOrderUpdated);
+        eventBusService.subscribe("printful.order_canceled", this.handlePrintfulOrderCanceled);
+
         eventBusService.subscribe("printful.package_shipped", this.handlePrintfulPackageShipped);
 
         eventBusService.subscribe("order.placed", this.handleOrderCreated);
         eventBusService.subscribe("order.updated", this.handleOrderUpdated);
         eventBusService.subscribe("order.completed", this.handleOrderCompleted);
-        eventBusService.subscribe("payment.payment_captured", this.handlePaymentCaptured);
+        eventBusService.subscribe("order.canceled", this.handleOrderCanceled);
+        // eventBusService.subscribe("payment.payment_captured", this.handlePaymentCaptured);
         // eventBusService.subscribe("product.updated", this.handleMedusaProductUpdated);
         // eventBusService.subscribe("product-variant.updated", this.handleMedusaVariantUpdated);
     }
@@ -95,32 +101,109 @@ class PrintfulSubscriber {
 
     handlePrintfulOrderUpdated = async (data: any) => {
         console.log("From handlePrintfulOrderUpdated - processing following event:", data)
-        const testOrderId = "order_01GTJ15739CSGA3VZ7P56J111B"
         // data.data.order.external_id
-        data.data.order.status = "inprocess";
-        const order = await this.orderService_.retrieve(testOrderId, {relations: ["items", "fulfillments", "payments", "shipping_methods", "billing_address"]});
+        const order = await this.orderService_.retrieve(data.data.order.external_id, {relations: ["items", "fulfillments", "payments", "shipping_methods", "billing_address"]});
         if (order) {
-            if (data.data.order.status === "inprocess") {
-                console.log(order.shipping_methods)
-                try {
-                    const fulfillment = await this.fulfillmentService.createFulfillment(order, order.items)
-                    console.log(fulfillment)
-                } catch (e) {
-                    console.log(e)
-                }
+            switch (data.data.order.status) {
+                case "draft":
+                    // the order has been created, but not yet submitted for fulfillment
+                    console.log("Created draft order in Printful")
+                    break;
+                case "pending":
+                    // the order has been submitted for fulfillment, but not yet processed / now it's time to capture the payment
+                    console.log(`Order ${order.id} is pending in Printful!`)
+                    try {
+                        console.log("Trying to capture payments...")
+                        const capturePayment = await this.orderService_.capturePayment(order.id)
+                        if (capturePayment) {
+                            console.log("Captured payment from order: ", capturePayment)
+                            break;
+                        }
+                    } catch (e) {
+                        console.log(e)
+                        break;
+                    }
+                case "inprocess":
+                    // the order is being fulfilled
+                    try {
+                        const itemsToFulfill: FulFillmentItemType[] = order.items.map(i => ({
+                            item_id: i.id,
+                            quantity: i.quantity
+                        }))
+
+                        const fulfillment = await this.orderService_.createFulfillment(order.id, itemsToFulfill)
+                        if (fulfillment) {
+                            console.log("Fulfillment created: ", fulfillment)
+                            break;
+                        }
+                    } catch (e) {
+                        console.log(e)
+                        break;
+                    }
+                    break;
+                case "canceled" || "archived":
+                    // Handle canceled or archived orders
+                    try {
+                        return await this.orderService_.cancel(order.id)
+                        break;
+                    } catch (e) {
+                        console.log(e)
+                        throw new Error("Order not found")
+                        break;
+                    }
+                case "fulfilled":
+                    // the order has been successfully fulfilled and shipped
+                    // console.log("Order fulfilled in Printful, trying to create a shipment in Medusa!")
+
+                    break;
+                case "reshipment":
+                case "partially_shipped":
+                case "returned":
+                    // Handle other status values
+                    break;
+                default:
+                    // Handle unknown status values
+                    break;
             }
+
 
         }
 
     }
 
+    handlePrintfulOrderCanceled = async (data: any) => {
+        console.log("From handlePrintfulOrderCanceled - processing following event:", data)
+        // try {
+        //     const order = await this.orderService_.retrieve(data.data.order.external_id);
+        //     if (order) {
+        //         return await this.orderService_.cancelOrder(order.id)
+        //     }
+        // } catch (e) {
+        //     console.log(e)
+        //     throw new Error("Order not found")
+        // }
 
+
+    }
     handlePrintfulPackageShipped = async (data: any) => {
+        const testOrderId = "order_01GX1B3K51E0XMC5KYSGAWY6HS"
+
         console.log("From subscriber - processing following event:", data)
         const orderData = data.data.order;
         const shipmentData = data.data.shipment;
 
-        const order = await this.orderService_.retrieve(orderData.external_id);
+        const order = await this.orderService_.retrieve(orderData.external_id, {relations: ["items", "fulfillments", "shipping_methods"]});
+        if (order) {
+            try {
+                const trackingLinks = [{url: shipmentData.tracking_url, tracking_number: shipmentData.tracking_number}]
+                const createShipment = await this.orderService_.createShipment(order.id, order.fulfillments[0].id, trackingLinks)
+                if (createShipment) {
+                    console.log("Created shipment in Medusa: ", createShipment)
+                }
+            } catch (e) {
+                console.log(e)
+            }
+        }
 
     }
 
@@ -132,11 +215,22 @@ class PrintfulSubscriber {
         console.log("From subscriber - processing handleMedusaVariantUpdated: -- NOT YET IMPLEMENTED", data)
     }
 
+    handleOrderCanceled = async (data: any) => {
+        console.log("From subscriber - processing handleOrderCanceled:", data)
+        try {
+            await this.printfulService.cancelOrder(data.id)
+
+        } catch (e) {
+            console.log(e)
+            throw new Error("Order not found")
+        }
+    }
     handleOrderCreated = async (data: any) => {
-        console.log("From handleOrderCreated - processing following event:", data)
-        const order = await this.orderService_.retrieve(data.id);
+        console.log("From handleOrderCreated - processing following event: ", data)
+        const order = await this.orderService_.retrieve(data.id, {relations: ["items", "shipping_methods", "shipping_address"]});
+        console.log("Retrieved order: ", order)
         if (order) {
-            await this.printfulFulfillmentService.createPrintfulOrder(order)
+            await this.printfulService.createPrintfulOrder(order)
         }
     }
 

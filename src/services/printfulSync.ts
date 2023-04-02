@@ -1,9 +1,7 @@
 import {ProductService, TransactionBaseService} from "@medusajs/medusa"
 import {EntityManager} from "typeorm"
-import {PrintfulClient} from "printful-request"
-import {CreateProductInput, UpdateProductInput} from "@medusajs/medusa/dist/types/product";
-import {UpdateProductVariantInput} from "@medusajs/medusa/dist/types/product-variant";
-import {kebabCase} from "lodash";
+import {PrintfulClient} from "../utils/printful-request"
+
 
 class PrintfulSyncService extends TransactionBaseService {
     protected manager_: EntityManager

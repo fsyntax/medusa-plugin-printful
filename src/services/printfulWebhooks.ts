@@ -1,6 +1,6 @@
 import {TransactionBaseService} from "@medusajs/medusa"
 import {EntityManager} from "typeorm"
-import {PrintfulClient} from "printful-request"
+import {PrintfulClient} from "../utils/printful-request"
 
 
 class PrintfulWebhooksService extends TransactionBaseService {
