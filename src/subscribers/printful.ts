@@ -58,9 +58,11 @@ class PrintfulSubscriber {
 
             const listedProducts = await this.productService.list({external_id: printfulProduct.id});
             if (listedProducts.length === 1) {
+                const medusaProduct = await this.productService.retrieve(listedProducts[0].id, {relations: ["variants", "options"]});
                 const updated = await this.printfulService.updateProduct({
                     sync_product: printfulProduct,
-                    sync_variants: printfulProductVariants
+                    sync_variants: printfulProductVariants,
+                    medusa_product: medusaProduct
                 }, "fromPrintful", null);
                 return updated;
             } else if (listedProducts.length > 1) {
