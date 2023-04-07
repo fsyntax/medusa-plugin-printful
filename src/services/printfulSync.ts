@@ -2,7 +2,7 @@ import {ProductService, TransactionBaseService} from "@medusajs/medusa"
 import {EntityManager} from "typeorm"
 import {PrintfulClient} from "../utils/printful-request"
 import {backOff, IBackOffOptions} from "exponential-backoff";
-import {bgBlue, bgGreen, red, redBright} from "colorette";
+import {bgBlue, bgGreen, blue, greenBright, red, redBright, yellowBright} from "colorette";
 
 class PrintfulSyncService extends TransactionBaseService {
     protected manager_: EntityManager
@@ -51,7 +51,7 @@ class PrintfulSyncService extends TransactionBaseService {
         return await this.printfulClient.get("oauth/scopes");
     }
     async syncPrintfulProducts() {
-        console.info("Heya! Starting to sync products from Printful! 👀")
+        console.info(greenBright(`Huhu! ${blue("Starting")} to ${blue("sync products")} from ${yellowBright("Printful")}! `))
 
         const {result: syncableProducts} = await this.printfulClient.get("store/products", {store_id: this.storeId});
 
@@ -80,14 +80,14 @@ class PrintfulSyncService extends TransactionBaseService {
 
                     if (existingProduct) {
                         console.log(`Product ${bgGreen(`${existingProduct.title}`)} already exists in Medusa! Preparing to update.. 🚧`)
-                        await this.printfulService.updateProduct({
+                        await this.printfulService.updateMedusaProduct({
                             sync_product: printfulProduct,
                             sync_variants: printfulProductVariants,
                             medusa_product: existingProduct
                         }, "fromPrintful", null);
                     } else {
                         console.log(`Product ${bgBlue(`${product.name}`)} does not exist in Medusa! Preparing to create.. ⚙️`)
-                        await this.printfulService.createProductInMedusa({
+                        await this.printfulService.createMedusaProduct({
                             sync_product: printfulProduct,
                             sync_variants: printfulProductVariants
                         });

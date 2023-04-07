@@ -84,7 +84,7 @@ class PrintfulService extends TransactionBaseService {
         )).filter((url, index, arr) => arr.indexOf(url) === index && url !== null && url !== '');
     }
 
-    async createProductInMedusa(rawProduct: any) {
+    async createMedusaProduct(rawProduct: any) {
         return await this.atomicPhase_(async (manager) => {
 
         const {
@@ -233,7 +233,7 @@ class PrintfulService extends TransactionBaseService {
     }
 
 
-    async updateProduct(rawProduct: any, type: string, data: any) {
+    async updateMedusaProduct(rawProduct: any, type: string, data: any) {
         return await this.atomicPhase_(async (manager) => {
             if (type === 'fromPrintful') {
 
@@ -250,7 +250,7 @@ class PrintfulService extends TransactionBaseService {
                 if (variantsToDelete.length > 0) {
                     console.log(`${yellowBright("Deleting variants unsynced with Printful...")} 🚮`);
                     for (const variant of variantsToDelete) {
-                        await this.deleteProductVariant(variant.id);
+                        await this.deleteMedusaProductVariant(variant.id);
                     }
                 }
 
@@ -405,6 +405,38 @@ class PrintfulService extends TransactionBaseService {
         });
     }
 
+    async updatePrintfulProduct(data: any) {
+
+        // get product from printful
+        try {
+            const {code, result: { sync_product: initialSyncProduct, sync_variants: initialSyncVariants} } = await this.printfulClient.get(`store/products/${data.external_id}`);
+
+           const syncProduct = {
+               external_id: data.id,
+               name: data.name,
+               id: initialSyncVariants.map((variant) => variant.metadata.printful_id),
+               sku: data.sku
+           }
+
+           const syncVariants = data.variants.map((variant) => {
+               console.log(data.variants)
+                return {
+                    id: variant.metadata.printful_id,
+                    variant_id: variant.metadata.printful_catalog_variant_id,
+                    external_id: variant.id,
+                    sku: variant.sku,
+                    name: variant.name,
+               }
+           })
+
+            console.log("syncProduct: ", syncProduct)
+            console.log("syncVariants: ", syncVariants)
+
+        } catch (e: any) {
+            console.log(red("There appeared to be an Error when trying to fetch the product from Printful!"),e)
+        }
+
+    }
 
     async getProductSizeGuide(printfulProductId) {
         console.log("Trying to get size guide for product: ", printfulProductId)
@@ -418,7 +450,7 @@ class PrintfulService extends TransactionBaseService {
         }
     }
 
-    async deleteProduct(productOrProductId: string) {
+    async deleteMedusaProduct(productOrProductId: string) {
         try {
             await this.productService.delete(productOrProductId);
             console.log(green(`Successfully deleted product ${productOrProductId} in Medusa 🪦`))
@@ -427,7 +459,7 @@ class PrintfulService extends TransactionBaseService {
         }
     }
 
-    async deleteProductVariant(variantOrVariantId: string) {
+    async deleteMedusaProductVariant(variantOrVariantId: string) {
         try {
             await this.productVariantService.delete(variantOrVariantId);
             console.log(green(`Successfully deleted variant ${variantOrVariantId} in Medusa 🪦`))

@@ -70,7 +70,7 @@ class PrintfulFulfillmentService extends FulfillmentService {
                 recipient: {
                     address1: cart.shipping_address.address_1,
                     city: cart.shipping_address.city,
-                    country_code: toUpper(cart.shispping_address.country_code),
+                    country_code: toUpper(cart.shipping_address.country_code),
                     zip: cart.shipping_address.postal_code,
                     phone: cart.shipping_address.phone || null,
                 },

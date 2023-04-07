@@ -53,8 +53,8 @@ export default (rootDirectory) => {
       countries,
     })
   })
-  router.options('/admin/printful/create_regions', cors(adminCorsOptions))
 
+  router.options('/admin/printful/create_regions', cors(adminCorsOptions))
   router.get('/admin/printful/create_regions', cors(adminCorsOptions), async (req, res) => {
     const printfulSyncService = req.scope.resolve('printfulSyncService')
     const { createdRegions, printfulCountries } = await printfulSyncService.createPrintfulRegions()
