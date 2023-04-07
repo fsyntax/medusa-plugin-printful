@@ -11,6 +11,7 @@ class PrintfulWebhooksService extends TransactionBaseService {
     private printfulClient: any;
     private eventBusService: any;
     private readonly enableWebhooks: any;
+
     private readonly printfulAccessToken: any;
 
 
@@ -22,6 +23,7 @@ class PrintfulWebhooksService extends TransactionBaseService {
         this.printfulAccessToken = options.printfulAccessToken;
         this.eventBusService = container.eventBusService;
         this.enableWebhooks = options.enableWebhooks;
+        this.manager_ = container.manager;
 
 
     }

@@ -1,4 +1,4 @@
-version: "3.8"
+version: '3.8'
 services:
   backend:
     build:
@@ -17,7 +17,7 @@ services:
       COOKIE_SECRET: something
       PORT: 9000
     ports:
-      - "9000:9000"
+      - '9000:9000'
     volumes:
       - .:/app/medusa
       - node_modules:/app/medusa/node_modules
@@ -25,7 +25,7 @@ services:
   postgres:
     image: postgres:10.4
     ports:
-      - "5432:5432"
+      - '5432:5432'
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres

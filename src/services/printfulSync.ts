@@ -50,39 +50,6 @@ class PrintfulSyncService extends TransactionBaseService {
     async getScopes() {
         return await this.printfulClient.get("oauth/scopes");
     }
-
-    // async syncPrintfulProducts() {
-    //     console.info("Heya! Starting to sync products from Printful! 👀")
-    //
-    //     const {result: syncableProducts} = await this.printfulClient.get("store/products", {store_id: this.storeId});
-    //
-    //     const delay = 60000 / 5; // 1 minute / 5 calls per minute
-    //
-    //     for (let i = 0; i < syncableProducts.length; i += this.batchSize) {
-    //         const batch = syncableProducts.slice(i, i + this.batchSize);
-    //         await Promise.all(batch.map(async product => {
-    //
-    //             console.log("product", product)
-    //
-    //             const existingProduct = await this.checkIfProductExists(product.id.toString());
-    //             const {result: printfulStoreProduct} = await this.printfulClient.get(`store/products/${product.id}`, {store_id: this.storeId});
-    //
-    //             if (existingProduct) {
-    //                 console.log(`Product ${existingProduct.title} already exists in Medusa! Preparing to update.. 🚧`)
-    //                 await this.printfulService.updateProduct(printfulStoreProduct, "fromPrintful", null);
-    //             } else {
-    //                 console.log(`Product ${product.name} does not exist in Medusa! Preparing to create.. ⚙️`)
-    //                 await this.printfulService.createProductInMedusa(printfulStoreProduct);
-    //             }
-    //
-    //         }));
-    //
-    //         if (i + this.batchSize < syncableProducts.length) {
-    //             await new Promise(resolve => setTimeout(resolve, delay));
-    //         }
-    //     }
-    //     return "Syncing done!"
-    // }
     async syncPrintfulProducts() {
         console.info("Heya! Starting to sync products from Printful! 👀")
 
@@ -104,9 +71,6 @@ class PrintfulSyncService extends TransactionBaseService {
                 const batch = syncableProducts.slice(i, i + this.batchSize);
                 await Promise.all(batch.map(async product => {
                     const existingProduct = await this.checkIfProductExists(product.id.toString());
-                    // const existingProduct = await this.productService.retrieve(listedProducts[0].id, {relations: ["variants", "options"]});
-
-
                     const {
                         result: {
                             sync_product: printfulProduct,

@@ -4,14 +4,22 @@
   "description": "A Printful integration for Medusa.",
   "author": "Marco Freiberger <fsyntax@protonmail.com>",
   "license": "MIT",
+  "repository": "https://github.com/medusajs/medusa-starter-default.git",
+  "keywords": [
+    "sqlite",
+    "ecommerce",
+    "headless",
+    "medusa"
+  ],
   "scripts": {
     "build": "babel src --out-dir . --ignore **/__tests__ --extensions \".ts,.js\"",
-    "watch": "babel -w src --out-dir . --ignore **/__tests__ --extensions \".ts,.js\""
+    "watch": "babel -w src --out-dir . --ignore **/__tests__ --extensions \".ts,.js\"",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "dependencies": {
     "@medusajs/medusa": "^1.7.15",
     "@types/lodash": "^4.14.191",
-    "colorette": "^2.0.19",
     "cors": "^2.8.5",
     "cross-fetch": "^3.1.5",
     "exponential-backoff": "^3.1.1",
@@ -20,19 +28,21 @@
     "medusa-interfaces": "^1.3.6",
     "typeorm": "^0.2.36"
   },
-  "repository": "https://github.com/medusajs/medusa-starter-default.git",
-  "keywords": [
-    "sqlite",
-    "ecommerce",
-    "headless",
-    "medusa"
-  ],
   "devDependencies": {
+    "@antfu/eslint-config": "^0.38.4",
     "@babel/cli": "^7.18.10",
     "@babel/core": "^7.18.10",
     "@babel/preset-typescript": "^7.14.5",
     "babel-preset-medusa-package": "^1.1.19",
     "body-parser": "^1.20.2",
+    "colorette": "^2.0.19",
+    "eslint": "^8.37.0",
     "lodash": "^4.17.21"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "yarn lint-staged"
+  },
+  "lint-staged": {
+    "*": "eslint --fix"
   }
 }
