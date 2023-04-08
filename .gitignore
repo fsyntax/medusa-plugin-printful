@@ -6,3 +6,8 @@
 yarn-error.log
 /.idea
 /.run
+/api
+/services
+/subscribers
+/utils
+yarn.lock
