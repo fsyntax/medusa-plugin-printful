@@ -1,18 +1,15 @@
 {
   "name": "medusa-plugin-printful",
-  "version": "0.0.1",
-  "description": "A Printful integration for Medusa.",
+  "version": "1.0.0",
+  "description": "A Medusa plugin that enables Printful as a fulfillment provider and provides product and order synchronization.",
   "author": "Marco Freiberger <fsyntax@protonmail.com>",
-  "license": "MIT",
-  "repository": "https://github.com/medusajs/medusa-starter-default.git",
-  "keywords": [
-    "sqlite",
-    "ecommerce",
-    "headless",
-    "medusa"
-  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fsyntax/medusa-plugin-printful.git"
+  },
   "scripts": {
     "build": "babel src --out-dir . --ignore **/__tests__ --extensions \".ts,.js\"",
+    "prepare": "cross-env NODE_ENV=production npm run build",
     "watch": "babel -w src --out-dir . --ignore **/__tests__ --extensions \".ts,.js\"",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
@@ -36,9 +33,17 @@
     "babel-preset-medusa-package": "^1.1.19",
     "body-parser": "^1.20.2",
     "colorette": "^2.0.19",
+    "cross-env": "^7.0.3",
     "eslint": "^8.37.0",
     "lodash": "^4.17.21"
   },
+  "keywords": [
+    "medusa",
+    "medusa-plugin",
+    "medusa-plugin-shipping",
+    "medusa-plugin-fulfillment",
+    "medusa-plugin-other"
+  ],
   "simple-git-hooks": {
     "pre-commit": "yarn lint-staged"
   },

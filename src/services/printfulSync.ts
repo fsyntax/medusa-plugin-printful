@@ -5,7 +5,9 @@ import {backOff, IBackOffOptions} from "exponential-backoff";
 import {bgBlue, bgGreen, blue, greenBright, red, redBright, yellowBright} from "colorette";
 
 class PrintfulSyncService extends TransactionBaseService {
+    // @ts-ignore
     protected manager_: EntityManager
+    // @ts-ignore
     protected transactionManager_: EntityManager
     private productService: ProductService;
     private printfulClient: any;
@@ -18,7 +20,7 @@ class PrintfulSyncService extends TransactionBaseService {
     private regionService: any;
     private printfulService: any;
     private printfulWebhooksService: any;
-    private batchSize: number;
+    private readonly batchSize: number;
 
     constructor(container, options) {
         super(container);
@@ -41,7 +43,7 @@ class PrintfulSyncService extends TransactionBaseService {
         }
         if (options.enableWebhooks) {
             this.printfulWebhooksService.createWebhooks().then().catch(e => {
-                throw new Error("Error creating Printful Webhooks")
+                console.log(red("Error creating Printful Webhooks!"), e)
             });
         }
 
@@ -50,6 +52,7 @@ class PrintfulSyncService extends TransactionBaseService {
     async getScopes() {
         return await this.printfulClient.get("oauth/scopes");
     }
+
     async syncPrintfulProducts() {
         console.info(greenBright(`Huhu! ${blue("Starting")} to ${blue("sync products")} from ${yellowBright("Printful")}! `))
 
@@ -58,10 +61,13 @@ class PrintfulSyncService extends TransactionBaseService {
         const delay = 60000 / 5; // 1 minute / 5 calls per minute
 
         const options: Partial<IBackOffOptions> = {
+            numOfAttempts: 5,
+            delayFirstAttempt: true,
+            startingDelay: delay,
+            timeMultiple: 2,
             jitter: 'full',
-            numOfAttempts: 3,
             retry: (e: any, attempts: number) => {
-                console.error(`${red(`Attempt ${redBright(`${attempts}`)} failed with error: ${e.message}`)}`);
+                console.error(`${red(`Attempt ${redBright(`${attempts}`)} failed with error: ${e}`)}`);
                 return true;
             }
         }
@@ -123,7 +129,7 @@ class PrintfulSyncService extends TransactionBaseService {
         const {id} = await this.productVariantService.retrieveBySKU(sku);
         // convert price string to number
         const priceNumber = parseInt(price, 10);
-        const updatedVariant = await this.productVariantService.setCurrencyPrice(id, {
+        return await this.productVariantService.setCurrencyPrice(id, {
             amount: priceNumber * 100,
             currency_code: "EUR"
         });

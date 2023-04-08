@@ -15,7 +15,9 @@ import {blue, green, greenBright, red, yellow, yellowBright} from "colorette";
 
 class PrintfulService extends TransactionBaseService {
 
+    // @ts-ignore
     protected manager_: EntityManager
+    // @ts-ignore
     protected transactionManager_: EntityManager
     private productService: ProductService;
     private orderService: OrderService;
@@ -87,148 +89,145 @@ class PrintfulService extends TransactionBaseService {
     async createMedusaProduct(rawProduct: any) {
         return await this.atomicPhase_(async (manager) => {
 
-        const {
-            sync_product: printfulSyncProduct,
-            sync_variants: printfulSyncVariants
+            const {
+                sync_product: printfulSyncProduct,
+                sync_variants: printfulSyncVariants
 
-        } = rawProduct;
+            } = rawProduct;
 
-        const defaultShippingProfile = await this.shippingProfileService.retrieveDefault();
-        const defaultSalesChannel = await this.salesChannelService.retrieveDefault();
-
-
-        const printfulCatalogProductVariants = await Promise.all(printfulSyncVariants.map(async (v) => {
-            const {result: {variant, product}} = await this.printfulClient.get(`products/variant/${v.variant_id}`);
-            return {
-                ...variant, parentProduct: product
-            }
-        }))
+            const defaultShippingProfile = await this.shippingProfileService.retrieveDefault();
+            const defaultSalesChannel = await this.salesChannelService.retrieveDefault();
 
 
-        function buildProductOptions() {
-            const options = [];
-
-            // Check if there are any variants with a non-null size option
-            const hasSize = printfulCatalogProductVariants.some(variant => variant.size !== null);
-
-            // Check if there are any variants with a non-null color option
-            const hasColor = printfulCatalogProductVariants.some(variant => variant.color !== null);
-
-            if (hasSize && hasColor) {
-                // Include both size and color options
-                options.push({title: "size"}, {title: "color"});
-            } else if (hasSize) {
-                // Only include size option
-                options.push({title: "size"});
-            } else if (hasColor) {
-                // Only include color option
-                options.push({title: "color"});
-            }
-            return options;
-        }
-
-        // const options =
-
-        const productObj: CreateProductInput = {
-            title: printfulSyncProduct.name,
-            handle: kebabCase(printfulSyncProduct.name),
-            thumbnail: printfulSyncProduct.thumbnail_url,
-            options: buildProductOptions(),
-            images: this.buildProductImages(printfulSyncVariants),
-            profile_id: defaultShippingProfile.id,
-            external_id: printfulSyncProduct.id,
-            sales_channels: [{id: defaultSalesChannel.id}],
-            metadata: {
-                printful_id: printfulSyncProduct.id
-            }
-        };
+            const printfulCatalogProductVariants = await Promise.all(printfulSyncVariants.map(async (v) => {
+                const {result: {variant, product}} = await this.printfulClient.get(`products/variant/${v.variant_id}`);
+                return {
+                    ...variant, parentProduct: product
+                }
+            }))
 
 
-        const productVariantsObj = await Promise.all(printfulSyncVariants.map(async (variant) => {
-            const {result: {variant: option}} = await this.printfulClient.get(`products/variant/${variant.variant_id}`);
+            function buildProductOptions() {
+                const options = [];
 
-            const productSizeGuide = await this.getProductSizeGuide(variant.product.product_id);
+                // Check if there are any variants with a non-null size option
+                const hasSize = printfulCatalogProductVariants.some(variant => variant.size !== null);
 
-            const options = {
-                ...(option.size ? {size: option.size} : {}),
-                ...(option.color ? {color: option.color} : {}),
-                ...(option.color_code ? {color_code: option.color_code} : {})
+                // Check if there are any variants with a non-null color option
+                const hasColor = printfulCatalogProductVariants.some(variant => variant.color !== null);
+
+                if (hasSize && hasColor) {
+                    // Include both size and color options
+                    options.push({title: "size"}, {title: "color"});
+                } else if (hasSize) {
+                    // Only include size option
+                    options.push({title: "size"});
+                } else if (hasColor) {
+                    // Only include color option
+                    options.push({title: "color"});
+                }
+                return options;
             }
 
-            return {
-                title: productObj.title + (option.size ? ` - ${option.size}` : '') + (option.color ? ` / ${option.color}` : ''),
-                sku: variant.sku,
-                external_id: variant.id,
-                manage_inventory: false,
-                allow_backorder: true,
-                inventory_quantity: 100,
-                prices: [{
-                    amount: this.convertToInteger(variant.retail_price),
-                    currency_code: variant.currency.toLowerCase()
-                }],
+            // const options =
+
+            const productObj: CreateProductInput = {
+                title: printfulSyncProduct.name,
+                handle: kebabCase(printfulSyncProduct.name),
+                thumbnail: printfulSyncProduct.thumbnail_url,
+                options: buildProductOptions(),
+                images: this.buildProductImages(printfulSyncVariants),
+                profile_id: defaultShippingProfile.id,
+                external_id: printfulSyncProduct.id,
+                sales_channels: [{id: defaultSalesChannel.id}],
                 metadata: {
-                    printful_id: variant.id,
-                    printful_catalog_variant_id: variant.variant_id,
-                    printful_product_id: variant.product.product_id,
-                    printful_catalog_product_id: variant.product.id,
-                    size_tables: productSizeGuide?.size_tables ?? null,
-                    ...options
+                    printful_id: printfulSyncProduct.id
+                }
+            };
+
+
+            const productVariantsObj = await Promise.all(printfulSyncVariants.map(async (variant) => {
+                const {result: {variant: option}} = await this.printfulClient.get(`products/variant/${variant.variant_id}`);
+
+                const productSizeGuide = await this.getProductSizeGuide(variant.product.product_id);
+
+                const options = {
+                    ...(option.size ? {size: option.size} : {}),
+                    ...(option.color ? {color: option.color} : {}),
+                    ...(option.color_code ? {color_code: option.color_code} : {})
+                }
+
+                return {
+                    title: productObj.title + (option.size ? ` - ${option.size}` : '') + (option.color ? ` / ${option.color}` : ''),
+                    sku: variant.sku,
+                    external_id: variant.id,
+                    manage_inventory: false,
+                    allow_backorder: true,
+                    inventory_quantity: 100,
+                    prices: [{
+                        amount: this.convertToInteger(variant.retail_price),
+                        currency_code: variant.currency.toLowerCase()
+                    }],
+                    metadata: {
+                        printful_id: variant.id,
+                        printful_catalog_variant_id: variant.variant_id,
+                        printful_product_id: variant.product.product_id,
+                        printful_catalog_product_id: variant.product.id,
+                        size_tables: productSizeGuide?.size_tables ?? null,
+                        ...options
+                    }
+                }
+            }))
+            const productToPush = {
+                ...productObj,
+                variants: productVariantsObj,
+            }
+            const createProductInMedusaWithRetry = async () => {
+                try {
+                    return await this.productService.create(productToPush);
+                } catch (error) {
+                    console.error('Error creating product in Medusa:', error);
+                    throw error;
+                }
+            };
+            const options: Partial<IBackOffOptions> = {
+                jitter: 'full',
+                numOfAttempts: 5,
+                timeMultiple: 2,
+                startingDelay: 1000,
+
+                retry: (e: any, attempts: number) => {
+                    console.error(`${yellow(`Attempt ${yellowBright(`${attempts}`)} failed with error: ${e.message}`)}`);
+                    return true;
                 }
             }
-        }))
-        const productToPush = {
-            ...productObj,
-            variants: productVariantsObj,
-        }
-        const createProductInMedusaWithRetry = async () => {
             try {
-                const createdProduct = await this.productService.create(productToPush);
-                console.log('Created product in Medusa:', productToPush);
-                return createdProduct;
-            } catch (error) {
-                console.error('Error creating product in Medusa:', error);
-                throw error;
-            }
-        };
-        const options: Partial<IBackOffOptions> = {
-            jitter: 'full',
-            numOfAttempts: 3,
-            retry: (e: any, attempts: number) => {
-                console.error(`${yellow(`Attempt ${yellowBright(`${attempts}`)} failed with error: ${e.message}`)}`);
-                return true;
-            }
-        }
-        try {
-            const createdProduct = await backOff(createProductInMedusaWithRetry, options);
-            console.log(green(`Created product in Medusa: ${greenBright(`${createdProduct.id}`)}`))
-            if (createdProduct) {
-                console.log('Trying to add options to variants...');
-                const {variants, options} = await this.productService.retrieve(createdProduct.id, {
-                    relations: ['variants', 'options'],
-                });
+                const createdProduct = await backOff(createProductInMedusaWithRetry, options);
+                console.log(green(`Created product in Medusa: ${greenBright(`${createdProduct.id}`)}`))
+                if (createdProduct) {
+                    console.log(blue(`Trying to add options to variants...`));
+                    const {variants, options} = await this.productService.retrieve(createdProduct.id, {
+                        relations: ['variants', 'options'],
+                    });
 
 
-                for (const option of options) {
-                    for (const variant of variants) {
-                        if (option.title === 'size' || option.title === 'color') {
-                            const value = variant.metadata[option.title];
-                            console.log(`Variant ${variant.id}: option ${option.title} = ${value} ℹ️`);
-                            // if (value !== undefined && option.values && value !== option.values[0].value) {
-                            if (value !== null) {
-                                console.log(`Updating variant ${variant.id} option ${option.id} to ${value}.. ⚙️`);
-                                const addedOption = await this.productVariantService.addOptionValue(variant.id, option.id, value);
-                                if (addedOption) {
-                                    console.log(`Updated variant ${variant.id} option ${option.id} to ${value}! ✅`);
+                    for (const option of options) {
+                        for (const variant of variants) {
+                            if (option.title === 'size' || option.title === 'color') {
+                                const value = variant.metadata[option.title];
+                                if (value !== null) {
+                                    const addedOption = await this.productVariantService.addOptionValue(variant.id, option.id, value);
+                                    if (addedOption) {
+                                        console.log(`Updated variant ${variant.id} option ${option.id} to ${value}! ✅`);
+                                    }
                                 }
                             }
-                            // }
                         }
                     }
                 }
+            } catch (e) {
+                console.error(red(`There appeared an error when trying to create a product in Medusa: `), e)
             }
-        } catch (e) {
-            console.error(red(`There appeared an error when trying to create a product in Medusa: `), e)
-        }
         })
     }
 
@@ -372,9 +371,8 @@ class PrintfulService extends TransactionBaseService {
                                 });
                                 for (const optionId in optionValues) {
                                     try {
-                                    await this.productVariantService.updateOptionValue(variant.id, optionId, optionValues[optionId]);
-                                    }
-                                    catch (e) {
+                                        await this.productVariantService.updateOptionValue(variant.id, optionId, optionValues[optionId]);
+                                    } catch (e) {
                                         console.error(red("Error updating option value:"), e.message);
                                     }
                                 }
@@ -409,31 +407,34 @@ class PrintfulService extends TransactionBaseService {
 
         // get product from printful
         try {
-            const {code, result: { sync_product: initialSyncProduct, sync_variants: initialSyncVariants} } = await this.printfulClient.get(`store/products/${data.external_id}`);
+            const {
+                code,
+                result: {sync_product: initialSyncProduct, sync_variants: initialSyncVariants}
+            } = await this.printfulClient.get(`store/products/${data.external_id}`);
 
-           const syncProduct = {
-               external_id: data.id,
-               name: data.name,
-               id: initialSyncVariants.map((variant) => variant.metadata.printful_id),
-               sku: data.sku
-           }
+            const syncProduct = {
+                external_id: data.id,
+                name: data.name,
+                id: initialSyncVariants.map((variant) => variant.metadata.printful_id),
+                sku: data.sku
+            }
 
-           const syncVariants = data.variants.map((variant) => {
-               console.log(data.variants)
+            const syncVariants = data.variants.map((variant) => {
+                console.log(data.variants)
                 return {
                     id: variant.metadata.printful_id,
                     variant_id: variant.metadata.printful_catalog_variant_id,
                     external_id: variant.id,
                     sku: variant.sku,
                     name: variant.name,
-               }
-           })
+                }
+            })
 
             console.log("syncProduct: ", syncProduct)
             console.log("syncVariants: ", syncVariants)
 
         } catch (e: any) {
-            console.log(red("There appeared to be an Error when trying to fetch the product from Printful!"),e)
+            console.log(red("There appeared to be an Error when trying to fetch the product from Printful!"), e)
         }
 
     }

@@ -1,5 +1,5 @@
 import {FulFillmentItemType} from "@medusajs/medusa/dist/types/fulfillment";
-import {bgGreenBright, blue, blueBright, green, greenBright, red} from "colorette";
+import {blue, blueBright, green, greenBright, red} from "colorette";
 
 
 class PrintfulSubscriber {
@@ -43,7 +43,7 @@ class PrintfulSubscriber {
         eventBusService.subscribe("order.updated", this.handleOrderUpdated);
         eventBusService.subscribe("order.completed", this.handleOrderCompleted);
         eventBusService.subscribe("order.canceled", this.handleOrderCanceled);
-        eventBusService.subscribe("product.updated", this.handleProductUpdated);
+        // eventBusService.subscribe("product.updated", this.handleProductUpdated);
     }
 
     handlePrintfulProductUpdated = async (data: any) => {
@@ -58,23 +58,22 @@ class PrintfulSubscriber {
             const listedProducts = await this.productService.list({external_id: printfulProduct.id});
             if (listedProducts.length === 1) {
                 const medusaProduct = await this.productService.retrieve(listedProducts[0].id, {relations: ["variants", "options"]});
-                const updated = await this.printfulService.updateMedusaProduct({
+                return await this.printfulService.updateMedusaProduct({
                     sync_product: printfulProduct,
                     sync_variants: printfulProductVariants,
                     medusa_product: medusaProduct
                 }, "fromPrintful", null);
-                return updated;
+
             } else if (listedProducts.length > 1) {
                 console.log(`Found multiple products with id ${printfulProduct.id} in Medusa, this shouldn't happen!`)
                 return false;
             } else if (listedProducts.length === 0) {
                 console.log(`Couldn't update product with id ${printfulProduct.id} in Medusa, does it exist yet? Attempting to create it! \n`)
                 try {
-                    const created = await this.printfulService.createMedusaProduct({
+                    return await this.printfulService.createMedusaProduct({
                         sync_product: printfulProduct,
                         sync_variants: printfulProductVariants
                     })
-                    return created;
                 } catch (e) {
                     console.log("Error creating product in Medusa", e)
                 }
@@ -138,7 +137,7 @@ class PrintfulSubscriber {
 
                         const fulfillment = await this.orderService_.createFulfillment(order.id, itemsToFulfill)
                         if (fulfillment) {
-                            console.log(green("Fulfillment created: ", ), green(fulfillment) )
+                            console.log(green("Fulfillment created: ",), green(fulfillment))
                             break;
                         }
                     } catch (e) {
@@ -154,7 +153,6 @@ class PrintfulSubscriber {
                         console.log(e)
                         throw new Error("Order not found")
                     }
-                    break;
                 case "fulfilled":
                     // the order has been successfully fulfilled and shipped
                     console.log(blue("Order fulfilled in Printful"))
@@ -239,7 +237,7 @@ class PrintfulSubscriber {
     handleProductUpdated = async (data: any) => {
         console.log(blue("From handleProductUpdated - processing following event:"), blue(data))
         const product = await this.productService.retrieve(data.id, {relations: ["variants"]})
-        if(product) {
+        if (product) {
             console.log(blue(`Retrieved '${blueBright(product.title)}, trying to update..': `), blue(product))
             return await this.printfulService.updatePrintfulProduct(product);
         }
