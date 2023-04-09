@@ -2,7 +2,7 @@ import {ProductService, TransactionBaseService} from "@medusajs/medusa"
 import {EntityManager} from "typeorm"
 import {PrintfulClient} from "../utils/printful-request"
 import {backOff, IBackOffOptions} from "exponential-backoff";
-import {bgBlue, bgGreen, blue, greenBright, red, redBright, yellowBright} from "colorette";
+import {blue, greenBright, red, yellow} from "colorette";
 
 class PrintfulSyncService extends TransactionBaseService {
     // @ts-ignore
@@ -54,20 +54,20 @@ class PrintfulSyncService extends TransactionBaseService {
     }
 
     async syncPrintfulProducts() {
-        console.info(greenBright(`Huhu! ${blue("Starting")} to ${blue("sync products")} from ${yellowBright("Printful")}! `))
+        console.info(`${greenBright("[medusa-plugin-printful]:")} Hey! Initial ${yellow("Printful synchronization")} has been started! This might take a while.. `)
 
         const {result: syncableProducts} = await this.printfulClient.get("store/products", {store_id: this.storeId});
 
-        const delay = 60000 / 5; // 1 minute / 5 calls per minute
+        const delay = 60000 / 3; // 1 minute / 3 calls per minute
 
         const options: Partial<IBackOffOptions> = {
-            numOfAttempts: 5,
+            numOfAttempts: 10,
             delayFirstAttempt: false,
             startingDelay: delay,
-            timeMultiple: 2,
+            timeMultiple: 3,
             jitter: 'full',
             retry: (e: any, attempts: number) => {
-                console.error(`${red(`Attempt ${redBright(`${attempts}`)} failed with error: ${e}`)}`);
+                console.error(`${red(`[medusa-plugin-printful]:`)} Error occurred while trying to sync products! Attempt ${attempts} of 5. Retrying in ${delay / 1000} seconds..`);
                 return true;
             }
         }
@@ -85,14 +85,14 @@ class PrintfulSyncService extends TransactionBaseService {
                     } = await this.printfulClient.get(`store/products/${product.id}`, {store_id: this.storeId});
 
                     if (existingProduct) {
-                        console.log(`Product ${bgGreen(`${existingProduct.title}`)} already exists in Medusa! Preparing to update.. 🚧`)
+                        console.log(`${blue("[medusa-plugin-printful]:")} Product ${blue(`${product.name}`)} already exists in Medusa! Preparing to update...️`)
                         await this.printfulService.updateMedusaProduct({
                             sync_product: printfulProduct,
                             sync_variants: printfulProductVariants,
                             medusa_product: existingProduct
                         }, "fromPrintful", null);
                     } else {
-                        console.log(`Product ${bgBlue(`${product.name}`)} does not exist in Medusa! Preparing to create.. ⚙️`)
+                        console.log(`${blue("[medusa-plugin-printful]:")} Product ${blue(`${product.name}`)} does not exist in Medusa! Preparing to create...️`)
                         await this.printfulService.createMedusaProduct({
                             sync_product: printfulProduct,
                             sync_variants: printfulProductVariants
