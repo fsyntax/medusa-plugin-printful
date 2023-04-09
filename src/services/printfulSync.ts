@@ -62,7 +62,7 @@ class PrintfulSyncService extends TransactionBaseService {
 
         const options: Partial<IBackOffOptions> = {
             numOfAttempts: 5,
-            delayFirstAttempt: true,
+            delayFirstAttempt: false,
             startingDelay: delay,
             timeMultiple: 2,
             jitter: 'full',

@@ -128,9 +128,7 @@ class PrintfulService extends TransactionBaseService {
                 }
                 return options;
             }
-
-            // const options =
-
+            
             const productObj: CreateProductInput = {
                 title: printfulSyncProduct.name,
                 handle: kebabCase(printfulSyncProduct.name),
