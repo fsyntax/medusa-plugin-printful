@@ -1,7 +1,6 @@
 import {ProductService, TransactionBaseService} from "@medusajs/medusa"
 import {EntityManager} from "typeorm"
 import {PrintfulClient} from "../utils/printful-request"
-import {backOff, IBackOffOptions} from "exponential-backoff";
 import {blue, greenBright, red, yellow} from "colorette";
 
 class PrintfulSyncService extends TransactionBaseService {
@@ -54,25 +53,13 @@ class PrintfulSyncService extends TransactionBaseService {
     }
 
     async syncPrintfulProducts() {
-        const delay = 60000
+        const delay = 10000
         console.info(`${greenBright("[medusa-plugin-printful]:")} Hey! Initial ${yellow("Printful synchronization")} has been started with a batch size of ${yellow(this.batchSize)}! This might take a while.. `)
 
         const {result: syncableProducts} = await this.printfulClient.get("store/products", {store_id: this.storeId});
 
 
-        const options: Partial<IBackOffOptions> = {
-            numOfAttempts: 10,
-            delayFirstAttempt: false,
-            startingDelay: 30000,
-            timeMultiple: 2,
-            jitter: 'full',
-            retry: (e: any, attempts: number) => {
-                console.error(`${red(`[medusa-plugin-printful]:`)} Error occurred while trying to sync products! Attempt ${attempts} of ${options.numOfAttempts}. Retrying in few seconds..`, e.error.message);
-                return true;
-            }
-        }
-
-        await backOff(async () => {
+        if (syncableProducts.length > 0) {
             for (let i = 0; i < syncableProducts.length; i += this.batchSize) {
                 const batch = syncableProducts.slice(i, i + this.batchSize);
                 await Promise.all(batch.map(async product => {
@@ -86,14 +73,14 @@ class PrintfulSyncService extends TransactionBaseService {
 
                     if (existingProduct) {
                         console.log(`${blue("[medusa-plugin-printful]:")} Product ${blue(`${product.name}`)} already exists in Medusa! Preparing to update...️`)
-                        await this.printfulService.updateMedusaProduct({
+                        return await this.printfulService.updateMedusaProduct({
                             sync_product: printfulProduct,
                             sync_variants: printfulProductVariants,
                             medusa_product: existingProduct
                         }, "fromPrintful", null);
                     } else {
                         console.log(`${blue("[medusa-plugin-printful]:")} Product ${blue(`${product.name}`)} does not exist in Medusa! Preparing to create...️`)
-                        await this.printfulService.createMedusaProduct({
+                        return await this.printfulService.createMedusaProduct({
                             sync_product: printfulProduct,
                             sync_variants: printfulProductVariants
                         });
@@ -106,7 +93,7 @@ class PrintfulSyncService extends TransactionBaseService {
                 }
             }
             return "Syncing done!";
-        }, options);
+        }
     }
 
     async addProductOptions(productId, optionTitle) {

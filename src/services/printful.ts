@@ -94,6 +94,19 @@ class PrintfulService extends TransactionBaseService {
     }
 
     async createMedusaProduct(rawProduct: any) {
+
+        const backoffOptions: Partial<IBackOffOptions> = {
+            numOfAttempts: 5,
+            delayFirstAttempt: false,
+            startingDelay: 60000,
+            timeMultiple: 3,
+            jitter: "full",
+            retry: (e: any, attempts: number) => {
+                console.error(`${red(`[medusa-plugin-printful]:`)} Error occurred while trying to create a product! Attempt ${attempts} of ${backoffOptions.numOfAttempts}. Error: `, red(e));
+                return true;
+            }
+        }
+
         return await this.atomicPhase_(async (manager) => {
             const {
                 sync_product: printfulSyncProduct,
@@ -105,14 +118,24 @@ class PrintfulService extends TransactionBaseService {
             const defaultSalesChannel = await this.salesChannelService.retrieveDefault();
 
 
-            const printfulCatalogProductVariants = await Promise.all(printfulSyncVariants.map(async (v) => {
-                const {result: {variant, product}} = await this.printfulClient.get(`products/variant/${v.variant_id}`);
-                return {
-                    ...variant, parentProduct: product
-                }
-            }))
+            const printfulCatalogProductVariants = await backOff(async () => {
+                return await Promise.all(printfulSyncVariants.map(async (v) => {
+                    const {
+                        result: {
+                            variant,
+                            product
+                        }
+                    } = await this.printfulClient.get(`products/variant/${v.variant_id}`);
+                    return {...variant, parentProduct: product};
+                }));
+            }, backoffOptions);
 
-            const productCategories = this.productCategories ? await this.buildProductCategory(printfulCatalogProductVariants) : [];
+
+            const productCategories = this.productCategories ?
+                await backOff(async () => {
+                    return await this.buildProductCategory(printfulCatalogProductVariants)
+                }, backoffOptions)
+                : [];
 
 
             function buildProductOptions() {
@@ -160,64 +183,50 @@ class PrintfulService extends TransactionBaseService {
                 }
             };
 
+            const productSizeGuide = await backOff(async () => {
+                return await this.getProductSizeGuide(printfulSyncVariants[0].product.product_id)
+            }, backoffOptions);
 
-            const productVariantsObj = await Promise.all(printfulSyncVariants.map(async (variant) => {
-                const {result: {variant: option}} = await this.printfulClient.get(`products/variant/${variant.variant_id}`);
+            const productVariantsObj = await backOff(async () => {
+                return await Promise.all(printfulSyncVariants.map(async (variant) => {
+                    const {result: {variant: option}} = await this.printfulClient.get(`products/variant/${variant.variant_id}`);
 
-                const productSizeGuide = await this.getProductSizeGuide(variant.product.product_id);
-
-                const options = {
-                    ...(option.size ? {size: option.size} : {}),
-                    ...(option.color ? {color: option.color} : {}),
-                    ...(option.color_code ? {color_code: option.color_code} : {})
-                }
-
-                return {
-                    title: productObj.title + (option.size ? ` - ${option.size}` : '') + (option.color ? ` / ${option.color}` : ''),
-                    sku: variant.sku,
-                    external_id: variant.id,
-                    manage_inventory: false,
-                    allow_backorder: true,
-                    inventory_quantity: 100,
-                    prices: [{
-                        amount: this.convertToInteger(variant.retail_price),
-                        currency_code: variant.currency.toLowerCase()
-                    }],
-                    metadata: {
-                        printful_id: variant.id,
-                        printful_catalog_variant_id: variant.variant_id,
-                        printful_product_id: variant.product.product_id,
-                        printful_catalog_product_id: variant.product.id,
-                        size_tables: productSizeGuide?.size_tables ?? null,
-                        ...options
+                    const options = {
+                        ...(option.size ? {size: option.size} : {}),
+                        ...(option.color ? {color: option.color} : {}),
+                        ...(option.color_code ? {color_code: option.color_code} : {})
                     }
-                }
-            }))
+
+                    return {
+                        title: productObj.title + (option.size ? ` - ${option.size}` : '') + (option.color ? ` / ${option.color}` : ''),
+                        sku: variant.sku,
+                        external_id: variant.id,
+                        manage_inventory: false,
+                        allow_backorder: true,
+                        inventory_quantity: 100,
+                        prices: [{
+                            amount: this.convertToInteger(variant.retail_price),
+                            currency_code: variant.currency.toLowerCase()
+                        }],
+                        metadata: {
+                            printful_id: variant.id,
+                            printful_catalog_variant_id: variant.variant_id,
+                            printful_product_id: variant.product.product_id,
+                            printful_catalog_product_id: variant.product.id,
+                            size_tables: productSizeGuide?.size_tables ?? null,
+                            ...options
+                        }
+                    }
+                }));
+            }, backoffOptions);
+
             const productToPush = {
                 ...productObj,
                 variants: productVariantsObj,
             }
-            const createProductInMedusaWithRetry = async () => {
-                try {
-                    return await this.productService.create(productToPush);
-                } catch (error) {
-                    console.error(`${red('[medusa-plugin-printful]:')} Error creating product in Medusa: `, error);
-                    throw error;
-                }
-            };
-            const options: Partial<IBackOffOptions> = {
-                jitter: 'full',
-                numOfAttempts: 10,
-                timeMultiple: 3,
-                startingDelay: 1000,
 
-                retry: (e: any, attempts: number) => {
-                    console.error(`${yellow(`[medusa-plugin-printful]:`)} Attempt ${yellowBright(`${attempts} failed with error: ${e.message}`)}`);
-                    return true;
-                }
-            }
             try {
-                const createdProduct = await backOff(createProductInMedusaWithRetry, options);
+                const createdProduct = await this.productService.create(productToPush);
                 console.log(`${green(`[medusa-plugin-printful]:`)} Created product in Medusa: ${green(`${createdProduct.id}`)}`);
                 if (createdProduct) {
                     console.log(`${blue("[medusa-plugin-printful]:")} Trying to add options to variants...`);
@@ -241,13 +250,27 @@ class PrintfulService extends TransactionBaseService {
                     }
                 }
             } catch (e) {
-                console.error(`${red("[medusa-plugin-printful]:")} There appeared an error when trying to create a product in Medusa: `, e)
+                console.error(`${red("[medusa-plugin-printful]:")} There appeared an error trying to create '${red(productObj.title)}' in Medusa: `, e)
+                throw e
             }
         })
     }
 
 
     async updateMedusaProduct(rawProduct: any, type: string, data: any) {
+
+        const backoffOptions: Partial<IBackOffOptions> = {
+            numOfAttempts: 5,
+            delayFirstAttempt: false,
+            startingDelay: 60000,
+            timeMultiple: 3,
+            jitter: "full",
+            retry: (e: any, attempts: number) => {
+                console.error(`${red(`[medusa-plugin-printful]:`)} Error occurred while trying to update a product! Attempt ${attempts} of ${backoffOptions.numOfAttempts}. Error: `, red(e.error));
+                return true;
+            }
+        }
+
         return await this.atomicPhase_(async (manager) => {
             if (type === 'fromPrintful') {
 
@@ -267,17 +290,20 @@ class PrintfulService extends TransactionBaseService {
                     }
                 }
 
-                const printfulCatalogProductVariants = await Promise.all(printfulProductVariant.map(async (v) => {
-                    const {
-                        result: {
-                            variant,
-                            product
+
+                const printfulCatalogProductVariants = await backOff(async () => {
+                    return await Promise.all(printfulProductVariant.map(async (v) => {
+                        const {
+                            result: {
+                                variant,
+                                product
+                            }
+                        } = await this.printfulClient.get(`products/variant/${v.variant_id}`);
+                        return {
+                            ...variant, parentProduct: product
                         }
-                    } = await this.printfulClient.get(`products/variant/${v.variant_id}`);
-                    return {
-                        ...variant, parentProduct: product
-                    }
-                }))
+                    }))
+                }, backoffOptions);
 
 
                 const productTags = Object.keys(
@@ -297,7 +323,11 @@ class PrintfulService extends TransactionBaseService {
                     }, {})
                 ).map((value) => ({value: capitalize(value)}));
 
-                const productCategories = this.productCategories ? await this.buildProductCategory(printfulCatalogProductVariants) : [];
+                const productCategories = this.productCategories ?
+                    await backOff(async () => {
+                        return await this.buildProductCategory(printfulCatalogProductVariants)
+                    }, backoffOptions)
+                    : [];
 
                 const productObj: UpdateProductInput = {
                     title: printfulProduct.name,
@@ -316,7 +346,10 @@ class PrintfulService extends TransactionBaseService {
                 const productSizeGuide = await this.getProductSizeGuide(printfulProductVariant[0].product.product_id);
 
                 const productVariantsObj = await Promise.all(printfulProductVariant.map(async (variant) => {
-                    const {result: {variant: option}} = await this.printfulClient.get(`products/variant/${variant.variant_id}`);
+
+                    const {result: {variant: option}} = await backOff(async () => {
+                        return await this.printfulClient.get(`products/variant/${variant.variant_id}`);
+                    }, backoffOptions)
 
                     const medusaVariant = medusaProduct.variants.find(v => v.metadata.printful_id === variant.id);
 
@@ -480,6 +513,8 @@ class PrintfulService extends TransactionBaseService {
     }
 
     async buildProductCategory(printfulCatalogProduct: any) {
+
+
         const categories = printfulCatalogProduct.map(({parentProduct}) => {
             return {
                 main_category_id: parentProduct.main_category_id,
@@ -489,7 +524,8 @@ class PrintfulService extends TransactionBaseService {
             const {
                 code,
                 result
-            } = await this.printfulClient.get(`categories/${categories[0].main_category_id}`);
+            } = await this.printfulClient.get(`categories/${categories[0].main_category_id}`)
+
 
             if (code === 200) {
 
@@ -497,7 +533,7 @@ class PrintfulService extends TransactionBaseService {
 
                 if (medusaCategory[0].length === 0) {
                     console.log(`${blue('[medusa-plugin-printful]:')} Category '${blue(result.category.title)}' not found in Medusa! Attempting to create..`)
-                    const res = await this.atomicPhase_(async (manager) => {
+                    return await this.atomicPhase_(async (manager) => {
                         try {
                             const newCategory = await this.productCategoryService.create({
                                 name: result.category.title,
@@ -508,7 +544,6 @@ class PrintfulService extends TransactionBaseService {
                             console.error(`${red('[medusa-plugin-printful]:')} Failed creating category '${red(result.category.title)}' in Medusa: `, e);
                         }
                     })
-                    return res
                 } else if (medusaCategory[0].length === 1) {
                     console.log(`${blue('[medusa-plugin-printful]:')} Category '${blue(result.category.title)}' found in Medusa!`)
                     return [{id: medusaCategory[0][0].id}]
@@ -516,7 +551,8 @@ class PrintfulService extends TransactionBaseService {
                 return []
             }
         } catch (e) {
-            console.error(`${red('[medusa-plugin-printful]:')} Failed getting category from Printful: `, e);
+            console.error(`${red('[medusa-plugin-printful]:')} Failed getting category from Printful: `, e.result);
+            throw e.result
         }
     }
 
