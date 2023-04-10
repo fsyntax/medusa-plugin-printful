@@ -53,6 +53,8 @@ To configure your Medusa server, simply add the following plguin configuration t
         enableWebhooks: true, 
         enableSync: true,
         batchSize: 3
+        productTags: true,
+        productCategories: true
     }
 }
 ```
@@ -68,6 +70,9 @@ To configure your Medusa server, simply add the following plguin configuration t
 - `batchSize`: Number of products to fetch from Printful per batch. (Note that Printful has got an API rate limit of 120
   requests per minute - since Printful products can have a lot of variants, it's recommended to keep this value low - I
   couldn't test it with thousands of products)
+- `productTags`: Enable or disable wether product tags should be created and updated in Medusa
+- `productCategories`: Enable or disable wether product the product category should be added and updated (non-existent
+  categories are going to be created) in Medusa.
 
 Please ensure that the `.env` variables for `printfulAccessToken`, `storeId`, and `backendUrl` are set accordingly.
 
@@ -91,6 +96,7 @@ authenticated users.
 - Creates and enables webhooks for Printful.
 - Listens to Printful webhook events and automatically syncs product information & orders between Printful and Medusa.
 - Can create regions in Medusa based on the regions available in Printful.
+- Can create product tags and categories in Medusa based on the tags and categories available in Printful.
 
 Overall, Medusa-Plugin-Printful simplifies the management of your e-commerce store by providing seamless integration
 with the Printful fulfillment service.
