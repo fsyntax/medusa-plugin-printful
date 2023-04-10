@@ -240,10 +240,8 @@ class PrintfulService extends TransactionBaseService {
                             if (option.title === 'size' || option.title === 'color') {
                                 const value = variant.metadata[option.title];
                                 if (value !== null) {
-                                    const addedOption = await this.productVariantService.addOptionValue(variant.id, option.id, value);
-                                    if (addedOption) {
-                                        console.log(`${green('[medusa-plugin-printful]:')} Updated variant ${variant.id} option ${option.id} to ${value}! ✅`);
-                                    }
+                                    await this.productVariantService.addOptionValue(variant.id, option.id, value);
+
                                 }
                             }
                         }
@@ -266,7 +264,8 @@ class PrintfulService extends TransactionBaseService {
             timeMultiple: 3,
             jitter: "full",
             retry: (e: any, attempts: number) => {
-                console.error(`${red(`[medusa-plugin-printful]:`)} Error occurred while trying to update a product! Attempt ${attempts} of ${backoffOptions.numOfAttempts}. Error: `, red(e.error));
+                const errorMessage = e?.error?.message || e;
+                console.error(`${red(`[medusa-plugin-printful]:`)} Error occurred while trying to update a product! Attempt ${attempts} of ${backoffOptions.numOfAttempts}. Error: `, red(errorMessage));
                 return true;
             }
         }
