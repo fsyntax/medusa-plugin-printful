@@ -7,10 +7,10 @@ import {
     FulFillmentItemType
 } from "@medusajs/medusa/dist/types/fulfillment";
 import {CreateProductInput, UpdateProductInput} from "@medusajs/medusa/dist/types/product";
-import {kebabCase} from "lodash";
+import {kebabCase, capitalize} from "lodash";
 import {backOff, IBackOffOptions} from "exponential-backoff";
 
-import {blue, green, red, yellow, yellowBright} from "colorette";
+import {blue, green, greenBright, red, yellow, yellowBright} from "colorette";
 
 
 class PrintfulService extends TransactionBaseService {
@@ -30,6 +30,8 @@ class PrintfulService extends TransactionBaseService {
     private shippingProfileService: any;
     private apiKey: any;
     private readonly productTags: Boolean;
+    private readonly productCategories: Boolean;
+    private productCategoryService: any;
 
     constructor(container, options) {
         super(container);
@@ -40,10 +42,13 @@ class PrintfulService extends TransactionBaseService {
         this.printfulClient = new PrintfulClient(options.printfulAccessToken);
         this.shippingProfileService = container.shippingProfileService;
         this.salesChannelService = container.salesChannelService;
+        this.productCategoryService = container.productCategoryService;
         this.storeId = options.storeId;
         this.apiKey = options.printfulAccessToken;
         this.manager_ = container.manager;
         this.productTags = options.productTags;
+        this.productCategories = options.productCategories;
+
     }
 
 
@@ -107,6 +112,8 @@ class PrintfulService extends TransactionBaseService {
                 }
             }))
 
+            const productCategories = this.productCategories ? await this.buildProductCategory(printfulCatalogProductVariants) : [];
+
 
             function buildProductOptions() {
                 const hasSize = printfulCatalogProductVariants.some(({size}) => size !== null);
@@ -134,7 +141,7 @@ class PrintfulService extends TransactionBaseService {
                     }
                     return acc;
                 }, {})
-            ).map((value) => ({value}));
+            ).map((value) => ({value: capitalize(value)}));
 
 
             const productObj: CreateProductInput = {
@@ -144,6 +151,7 @@ class PrintfulService extends TransactionBaseService {
                 options: buildProductOptions(),
                 images: this.buildProductImages(printfulSyncVariants),
                 tags: this.productTags ? productTags : [],
+                categories: productCategories,
                 profile_id: defaultShippingProfile.id,
                 external_id: printfulSyncProduct.id,
                 sales_channels: [{id: defaultSalesChannel.id}],
@@ -287,8 +295,9 @@ class PrintfulService extends TransactionBaseService {
                         }
                         return acc;
                     }, {})
-                ).map((value) => ({value}));
+                ).map((value) => ({value: capitalize(value)}));
 
+                const productCategories = this.productCategories ? await this.buildProductCategory(printfulCatalogProductVariants) : [];
 
                 const productObj: UpdateProductInput = {
                     title: printfulProduct.name,
@@ -296,6 +305,7 @@ class PrintfulService extends TransactionBaseService {
                     thumbnail: printfulProduct.thumbnail_url,
                     external_id: printfulProduct.id,
                     tags: this.productTags ? productTags : [],
+                    categories: this.productCategories ? productCategories : [],
                     images: this.buildProductImages(printfulProductVariant),
                     metadata: {
                         printful_id: printfulProduct.id,
@@ -332,19 +342,24 @@ class PrintfulService extends TransactionBaseService {
                             metadata
                         };
                     } else {
-                        console.log(blue(`Variant with SKU '${variant.sku}' not found in Medusa! Attempting to create...`));
-                        const sizeOptionId = medusaProduct.options.find(o => o.title === 'size').id;
-                        const colorOptionId = medusaProduct.options.find(o => o.title === 'color').id;
-                        const options = [
-                            {
+                        console.log(`${blue(`[medusa-plugin-printful]:`)} Creating new variant for product ${blue(medusaProduct.id)}...`);
+
+                        const sizeOptionId = medusaProduct.options.find(o => o.title === 'size')?.id ?? null;
+                        const colorOptionId = medusaProduct.options.find(o => o.title === 'color')?.id ?? null;
+
+                        const options = [];
+                        if (sizeOptionId) {
+                            options.push({
                                 option_id: sizeOptionId,
                                 value: option.size
-                            },
-                            {
+                            })
+                        }
+                        if (colorOptionId) {
+                            options.push({
                                 option_id: colorOptionId,
                                 value: option.color
-                            }
-                        ];
+                            })
+                        }
 
                         const newVariant = await this.productVariantService.create(medusaProduct.id, {
                             title: `${productObj.title} - ${option.size} / ${option.color}`,
@@ -360,15 +375,39 @@ class PrintfulService extends TransactionBaseService {
                             }],
                             metadata: {
                                 printful_id: variant.id,
+                                printful_catalog_variant_id: variant.variant_id,
                                 size: option.size,
                                 color: option.color,
-                                color_code: option.color_code
+                                color_code: option.color_code,
+                                ...productSizeGuide
                             }
                         });
 
                         if (newVariant) {
                             await this.productVariantService.update(newVariant.id, {metadata: {medusa_id: newVariant.id}});
-                            console.log(`Successfully created variant ${newVariant.id} for product ${medusaProduct.id}! 🎉`);
+                            console.log(`${green("[medusa-plugin-printful]: ")} Created variant '${green(newVariant.title)}' in Medusa!`);
+
+                            const title = productObj.title + (option.size ? ` - ${option.size}` : '') + (option.color ? ` / ${option.color}` : '');
+                            const metadata = {
+                                medusa_id: newVariant.id,
+                                printful_id: variant.id,
+                                printful_catalog_variant_id: variant.variant_id,
+                                size: option.size,
+                                color: option.color,
+                                color_code: option.color_code,
+                                ...productSizeGuide
+                            };
+
+                            return {
+                                title,
+                                sku: variant.sku,
+                                prices: [{
+                                    amount: this.convertToInteger(variant.retail_price),
+                                    currency_code: variant.currency.toLowerCase()
+                                }],
+                                metadata
+                            };
+
                         }
                     }
                 }));
@@ -376,7 +415,7 @@ class PrintfulService extends TransactionBaseService {
 
                 try {
                     const updatedProduct = await this.productService.update(medusaProduct.id, productObj);
-                    console.log(`Updated '${updatedProduct.title}' in Medusa! 🎉`);
+                    console.log(`${green("[medusa-plugin-printful]: ")} Updated '${green(updatedProduct.title)}' in Medusa! `);
 
                     const updatedVariants = await Promise.all(productVariantsObj.map(async (variant) => {
                         const variantToUpdate = await this.productVariantService.update(variant.metadata.medusa_id, {
@@ -391,18 +430,18 @@ class PrintfulService extends TransactionBaseService {
                     }));
 
                     if (updatedVariants) {
-                        console.log(`Also updated '${updatedVariants.length}' variants from '${updatedProduct.title}' in Medusa! 🥳`);
+                        console.log(`${green("[medusa-plugin-printful]: ")} Also updated '${updatedVariants.length}' variants from '${blue(updatedProduct.title)}' in Medusa!`);
 
                         const {variants, options} = await this.productService.retrieve(updatedProduct.id, {
                             relations: ['variants', 'options'],
                         });
 
                         try {
-                            console.log(blue(`Trying to update options on variants..`))
+                            console.log(`${blue("[medusa-plugin-printful]: ")} Updating options on variants from ${blue(productObj.title)}...`);
                             const updateVariantOptionsPromises = variants.map(async (variant) => {
                                 const optionValues = {};
                                 options.map((option) => {
-                                    if (option.title === 'size' || option.title === 'color' || option.title === 'color_code') {
+                                    if (option.title === 'size' || option.title === 'color') {
                                         optionValues[option.id] = variant.metadata[option.title];
                                     }
                                 });
@@ -410,34 +449,75 @@ class PrintfulService extends TransactionBaseService {
                                     try {
                                         await this.productVariantService.updateOptionValue(variant.id, optionId, optionValues[optionId]);
                                     } catch (e) {
-                                        console.error(red("Error updating option value:"), e.message);
+                                        console.error(`${red("[medusa-plugin-printful]: ")} Error updating option value on variant ${red(variant.title)}: `, e.message);
                                     }
                                 }
                             });
                             await Promise.all(updateVariantOptionsPromises);
-                            console.log(green(`Updated options on several variants! 🔍`));
+                            console.log(`${green("[medusa-plugin-printful]: ")} Updated options on several variants from ${green(productObj.title)}!`);
                         } catch (e) {
-                            console.error("Error updating options on variants: ", e);
+                            console.error(`${red("[medusa-plugin-printful]: ")} Error updating options on variants from ${red(productObj.title)}:  `, e.message);
                         }
 
                         try {
-                            console.log(blue(`Trying to update prices on variants..`))
+                            console.log(`${blue("[medusa-plugin-printful]: ")} Updating prices on variants...`);
                             const updateVariantPricesPromises = productVariantsObj.map(async (variant) => {
                                 await this.productVariantService.updateVariantPrices(variant.metadata.medusa_id, variant.prices);
                             });
 
                             await Promise.all(updateVariantPricesPromises);
-                            console.log(green(`Updated prices on several variants! 💰`));
+                            console.log(`${green("[medusa-plugin-printful]: ")} Updated several variant prices from ${green(productObj.title)}!`);
                         } catch (e) {
-                            console.error("Error updating prices on variants: ", e);
+                            console.error(`${red("[medusa-plugin-printful]: ")} There occurred an error while trying to update variant prices from ${red(productObj.title)}: `, e.message);
                         }
                     }
                 } catch (e) {
-                    console.error("Error updating product in Medusa: ", e);
+                    console.error(`${red("[medusa-plugin-printful]: ")} Error while trying to update ${red(productObj.title)} in Medusa:`, e.message);
                 }
-                return "Could not update product";
+                return "[medusa-plugin-printful]: Could not update product";
             }
         });
+    }
+
+    async buildProductCategory(printfulCatalogProduct: any) {
+        const categories = printfulCatalogProduct.map(({parentProduct}) => {
+            return {
+                main_category_id: parentProduct.main_category_id,
+            }
+        })
+        try {
+            const {
+                code,
+                result
+            } = await this.printfulClient.get(`categories/${categories[0].main_category_id}`);
+
+            if (code === 200) {
+
+                const medusaCategory = await this.productCategoryService.listAndCount({q: result.category.title});
+
+                if (medusaCategory[0].length === 0) {
+                    console.log(`${blue('[medusa-plugin-printful]:')} Category '${blue(result.category.title)}' not found in Medusa! Attempting to create..`)
+                    const res = await this.atomicPhase_(async (manager) => {
+                        try {
+                            const newCategory = await this.productCategoryService.create({
+                                name: result.category.title,
+                            })
+                            console.log(`${green('[medusa-plugin-printful]:')} Successfully created category '${green(result.category.title)}' in Medusa!`)
+                            return [{id: newCategory.id}]
+                        } catch (e) {
+                            console.error(`${red('[medusa-plugin-printful]:')} Failed creating category '${red(result.category.title)}' in Medusa: `, e);
+                        }
+                    })
+                    return res
+                } else if (medusaCategory[0].length === 1) {
+                    console.log(`${blue('[medusa-plugin-printful]:')} Category '${blue(result.category.title)}' found in Medusa!`)
+                    return [{id: medusaCategory[0][0].id}]
+                }
+                return []
+            }
+        } catch (e) {
+            console.error(`${red('[medusa-plugin-printful]:')} Failed getting category from Printful: `, e);
+        }
     }
 
     async updatePrintfulProduct(data: any) {
@@ -499,9 +579,9 @@ class PrintfulService extends TransactionBaseService {
     async deleteMedusaProductVariant(variantOrVariantId: string) {
         try {
             await this.productVariantService.delete(variantOrVariantId);
-            console.log(green(`Successfully deleted variant ${variantOrVariantId} in Medusa 🪦`))
+            console.log(`${greenBright("[medusa-plugin-printful]:")} Successfully deleted variant ${greenBright(variantOrVariantId)} in Medusa 🪦`)
         } catch (e) {
-            console.log(red(`Failed to delete product ${variantOrVariantId} in Medusa 🙇‍`))
+            console.log(`${red("[medusa-plugin-printful]:")} Failed to delete variant ${red(variantOrVariantId)} in Medusa 🙇‍♂️`)
         }
     }
 
@@ -547,9 +627,8 @@ class PrintfulService extends TransactionBaseService {
     }
 
     async createPrintfulOrder(data: any) {
-        console.log("Preparing order data for Printful..: ", data)
-        console.log(data.items[0].variant)
-        console.log("shipping method", data.shipping_methods[0].shipping_option)
+        console.log(`${blue('[medusa-plugin-printful]:')} Creating order with order_id '${blue(data.id)}' in Printful: `, data)
+
         const orderObj = {
             external_id: data.id,
             shipping: data.shipping_methods[0].shipping_option.data.id,
@@ -577,34 +656,34 @@ class PrintfulService extends TransactionBaseService {
             })
         }
         try {
-            console.log("Sending order to Printful with the following data... ➡️", orderObj)
+            console.log(`${blue("[medusa-plugin-printful]:")} Trying to send the order to printful with the following data: `, orderObj)
             const order = await this.printfulClient.post("orders", {
                 ...orderObj,
                 store_id: this.storeId,
                 confirm: false
             });
             if (order.code === 200) {
-                console.log("Order successfully sent to Printful! 📬🥳: ", order.result)
+                console.log(`${green("[medusa-plugin-printful]:")} Successfully created the order on Printful! `, order.result)
             }
         } catch (e) {
-            console.log(e)
+            console.log(`${red("[medusa-plugin-printful]:")} There was an error when trying to create the order on Printful! `, e)
         }
     }
 
     async cancelOrder(orderId: string | number) {
         try {
-            console.log("store id", this.storeId)
+            console.log(`${yellow("[medusa-plugin-printful]:")} Trying to cancel order with id ${yellow(orderId)} on Printful`)
             const {result, code} = await this.printfulClient.delete(`orders/@${orderId}`, {store_id: this.storeId});
 
             if (code === 200) {
-                console.log("Order has been canceled on Printful!", result)
+                console.log(`${green("[medusa-plugin-printful]:")} Order has been successfully canceled!`, result)
                 return result;
             } else {
-                console.log("Order was not canceled on Printful!", result)
+                console.log(`${red("[medusa-plugin-printful]:")} There was an error when trying to cancel the order on Printful! `, result)
                 return result;
             }
         } catch (e) {
-            console.log(e)
+            console.log(`${red("[medusa-plugin-printful]:")} There was an error when trying to cancel the order on Printful! `, e)
         }
     }
 

@@ -1,6 +1,7 @@
 import {TransactionBaseService} from "@medusajs/medusa"
 import {EntityManager} from "typeorm"
 import {PrintfulClient} from "../utils/printful-request"
+import {greenBright} from "colorette";
 
 
 class PrintfulWebhooksService extends TransactionBaseService {
@@ -29,9 +30,9 @@ class PrintfulWebhooksService extends TransactionBaseService {
     }
 
     async createWebhooks() {
-        console.log("Setting up Printful Webhook Support... 🚀")
+        console.log(`${greenBright("[medusa-plugin-printful]:")} Creating Printful Webhooks!`)
         const currentWebhookConfig = await this.printfulClient.get("webhooks", {store_id: this.storeId});
-        console.log("Current Printful Webhook Config: ", currentWebhookConfig)
+        console.log(`${greenBright("[medusa-plugin-printful]: ")} Your current Printful Webhook configuration: `, currentWebhookConfig)
         if (currentWebhookConfig.url !== `${this.backendUrl}/printful/webhook`) {
             const webhookTypes = [
                 "package_shipped",
@@ -53,10 +54,10 @@ class PrintfulWebhooksService extends TransactionBaseService {
                 types: webhookTypes,
             });
             if (setWebhookConfig.code === 200) {
-                console.log("Successfully set up Printful Webhook Support! 🥳");
+                console.log(`${greenBright("[medusa-plugin-printful]:")} Printful Webhook Support is enabled! `);
             }
         } else {
-            console.log("Printful Webhook Support is already enabled! 🎉")
+            console.log(`${greenBright("[medusa-plugin-printful]:")} Printful Webhook Support is already enabled! `);
         }
     }
 

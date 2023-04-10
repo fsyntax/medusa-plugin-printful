@@ -47,8 +47,7 @@ class PrintfulSubscriber {
     }
 
     handlePrintfulProductUpdated = async (data: any) => {
-        console.log("From handlePrintfulProductUpdated subscriber:", data)
-
+        console.log(`${blueBright("[medusa-plugin-printful]:")} Received a webhook event from Printful! [${blueBright(data.type)}]: \n`, data)
         try {
             const {
                 sync_product: printfulProduct,
@@ -65,59 +64,57 @@ class PrintfulSubscriber {
                 }, "fromPrintful", null);
 
             } else if (listedProducts.length > 1) {
-                console.log(`Found multiple products with id ${printfulProduct.id} in Medusa, this shouldn't happen!`)
+                console.log(`${red("[medusa-plugin-printful]:")} Found multiple products with the same external id '${red(printfulProduct.id)}' in Medusa, this should not happen!`)
                 return false;
             } else if (listedProducts.length === 0) {
-                console.log(`Couldn't update product with id ${printfulProduct.id} in Medusa, does it exist yet? Attempting to create it! \n`)
+                console.log(`${blueBright("[medusa-plugin-printful]:")} Product with external id '${blueBright(printfulProduct.id)}' not found in Medusa, creating new product...`)
                 try {
                     return await this.printfulService.createMedusaProduct({
                         sync_product: printfulProduct,
                         sync_variants: printfulProductVariants
                     })
                 } catch (e) {
-                    console.log("Error creating product in Medusa", e)
+                    console.log(`${red("[medusa-plugin-printful]:")} Failed to create product in Medusa: `, e)
                 }
 
             }
         } catch (e: any) {
-            console.log("Error updating product in Medusa", e)
+            console.log(`${red("[medusa-plugin-printful]:")} Failed to update product in Medusa: `, e)
         }
 
 
     }
 
     handlePrintfulProductDeleted = async (data: any) => {
-        console.log("From subscriber - processing following event:", data)
+        console.log(`${blueBright("[medusa-plugin-printful]:")} Received a webhook event from Printful! [${blueBright(data.type)}]: \n`, data)
         const existingProduct = await this.productService.retrieveByExternalId(data.data.sync_product.id);
         if (!existingProduct) {
-            console.log(`Failed to delete product ${data.data.sync_product.name} in Medusa 🙇‍♂️`)
+            console.log(`${blue("[medusa-plugin-printful]:")} Product with external id '${blue(data.data.sync_product.id)}' not found in Medusa, nothing to delete!`)
             return;
         }
         await this.productService.delete(existingProduct.id)
-        console.log(`Successfully deleted product ${existingProduct.id} in Medusa 🪦`)
+        console.log(`${green("[medusa-plugin-printful]:")} Deleted product with external id '${green(data.data.sync_product.id)}' from Medusa! RIP!`)
 
 
     }
 
     handlePrintfulOrderUpdated = async (data: any) => {
-        console.log(blue("From handlePrintfulOrderUpdated - processing following event: "), data)
-        // data.data.order.external_id
-        //  data.data.order.status = "inprocess"
+        console.log(`${blueBright("[medusa-plugin-printful]:")} Received a webhook event from Printful! [${blueBright(data.type)}]: \n`, data)
+
         const order = await this.orderService_.retrieve(data.data.order.external_id, {relations: ["items", "fulfillments", "payments", "shipping_methods", "billing_address"]});
+
         if (order) {
             switch (data.data.order.status) {
                 case "draft":
-                    // the order has been created, but not yet submitted for fulfillment
-                    console.log("Created draft order in Printful")
+                    console.log(`${blue("[medusa-plugin-printful]:")} Order ${blue(data.data.order.external_id)} is a draft in Printful!`)
                     break;
                 case "pending":
-                    // the order has been submitted for fulfillment, but not yet processed / now it's time to capture the payment
-                    console.log(blue(`Order ${order.id} is pending in Printful!`))
+                    console.log(`${blue("[medusa-plugin-printful]:")} Order ${blue(data.data.order.external_id)} has been submitted for fulfillment in Printful!`)
                     try {
-                        console.log(blue("Trying to capture payments..."))
+                        console.log(`${blue("[medusa-plugin-printful]:")} Capturing payment for order ${blue(data.data.order.external_id)}...`)
                         const capturePayment = await this.orderService_.capturePayment(order.id)
                         if (capturePayment) {
-                            console.log(green("Captured payment from order: "), capturePayment)
+                            console.log(`${green("[medusa-plugin-printful]:")} Successfully captured the payment: `, capturePayment)
                             break;
                         }
                     } catch (e) {
@@ -126,8 +123,7 @@ class PrintfulSubscriber {
                     }
                     break;
                 case "inprocess":
-                    // the order is being fulfilled
-                    console.log(green(`Order ${greenBright(`${order.id}`)} is fulfilled in Printful!`))
+                    console.log(`${blue("[medusa-plugin-printful]:")} Order ${blue(data.data.order.external_id)} is being fulfilled in Printful!`)
 
                     try {
                         const itemsToFulfill: FulFillmentItemType[] = order.items.map(i => ({
@@ -137,7 +133,7 @@ class PrintfulSubscriber {
 
                         const fulfillment = await this.orderService_.createFulfillment(order.id, itemsToFulfill)
                         if (fulfillment) {
-                            console.log(green("Fulfillment created: ",), green(fulfillment))
+                            console.log(`${green("[medusa-plugin-printful]:")} Successfully created fulfillment: `, fulfillment)
                             break;
                         }
                     } catch (e) {
@@ -155,7 +151,7 @@ class PrintfulSubscriber {
                     }
                 case "fulfilled":
                     // the order has been successfully fulfilled and shipped
-                    console.log(blue("Order fulfilled in Printful"))
+                    // ignoring this event, as we are using the "shipped" event instead
                     break;
                 case "reshipment":
                 case "partially_shipped":
@@ -173,35 +169,39 @@ class PrintfulSubscriber {
     }
 
     handlePrintfulOrderCanceled = async (data: any) => {
-        console.log("From handlePrintfulOrderCanceled - processing following event:", data)
-        // try {
-        //     const order = await this.orderService_.retrieve(data.data.order.external_id);
-        //     if (order) {
-        //         return await this.orderService_.cancelOrder(order.id)
-        //     }
-        // } catch (e) {
-        //     console.log(e)
-        //     throw new Error("Order not found")
-        // }
+        console.log(`${blueBright("[medusa-plugin-printful]:")} Received a webhook event from Printful! [${blueBright(data.type)}]: \n`, data)
+        try {
+            console.log(`${blue("[medusa-plugin-printful]:")} Order ${blue(data.data.order.external_id)} has been canceled in Printful! Trying to cancel in Medusa aswell..`)
+            const order = await this.orderService_.retrieve(data.data.order.external_id);
+            if (order) {
+                const canceld = await this.orderService_.cancelOrder(order.id)
+                if (canceld)
+                    console.log(`${green("[medusa-plugin-printful]:")} Order ${blue(data.data.order.external_id)} has been successfully canceled in Medusa!`)
+            }
+        } catch (e) {
+            console.log(`${red("[medusa-plugin-printful]:")} Failed to cancel order in Medusa: `, e)
+        }
 
 
     }
     handlePrintfulPackageShipped = async (data: any) => {
 
-        console.log(blue("From subscriber - processing following event: "), blue(data))
+        console.log(`${blueBright("[medusa-plugin-printful]:")} Received a webhook event from Printful! [${blueBright(data.type)}]: \n`, data)
         const orderData = data.data.order;
         const shipmentData = data.data.shipment;
 
         const order = await this.orderService_.retrieve(orderData.external_id, {relations: ["items", "fulfillments", "shipping_methods"]});
         if (order) {
+            console.log(`${blue("[medusa-plugin-printful]:")} Order ${blue(orderData.external_id)} has been found, preparing to create a shipment in Medusa!`)
             try {
                 const trackingLinks = [{url: shipmentData.tracking_url, tracking_number: shipmentData.tracking_number}]
+                console.log(`${blue("[medusa-plugin-printful]:")} Tracking links: `, trackingLinks)
                 const createShipment = await this.orderService_.createShipment(order.id, order.fulfillments[0].id, trackingLinks)
                 if (createShipment) {
-                    console.log(green("Created shipment in Medusa: "), green(createShipment))
+                    console.log(`${greenBright("[medusa-plugin-printful]:")} Successfully created shipment: `, createShipment)
                 }
             } catch (e) {
-                console.log(red(e))
+                console.log(`${red("[medusa-plugin-printful]:")} Error creating shipment: `, e)
             }
         }
 

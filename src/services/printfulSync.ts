@@ -54,20 +54,20 @@ class PrintfulSyncService extends TransactionBaseService {
     }
 
     async syncPrintfulProducts() {
-        console.info(`${greenBright("[medusa-plugin-printful]:")} Hey! Initial ${yellow("Printful synchronization")} has been started! This might take a while.. `)
+        const delay = 60000
+        console.info(`${greenBright("[medusa-plugin-printful]:")} Hey! Initial ${yellow("Printful synchronization")} has been started with a batch size of ${yellow(this.batchSize)}! This might take a while.. `)
 
         const {result: syncableProducts} = await this.printfulClient.get("store/products", {store_id: this.storeId});
 
-        const delay = 60000 / 3; // 1 minute / 3 calls per minute
 
         const options: Partial<IBackOffOptions> = {
             numOfAttempts: 10,
             delayFirstAttempt: false,
-            startingDelay: delay,
-            timeMultiple: 3,
+            startingDelay: 30000,
+            timeMultiple: 2,
             jitter: 'full',
             retry: (e: any, attempts: number) => {
-                console.error(`${red(`[medusa-plugin-printful]:`)} Error occurred while trying to sync products! Attempt ${attempts} of 5. Retrying in ${delay / 1000} seconds..`);
+                console.error(`${red(`[medusa-plugin-printful]:`)} Error occurred while trying to sync products! Attempt ${attempts} of ${options.numOfAttempts}. Retrying in few seconds..`, e.error.message);
                 return true;
             }
         }
