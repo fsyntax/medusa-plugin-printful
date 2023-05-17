@@ -9,5 +9,6 @@ yarn-error.log
 /api
 /services
 /subscribers
+/strategies
 /utils
 yarn.lock

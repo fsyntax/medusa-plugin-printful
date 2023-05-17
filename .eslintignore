@@ -1,6 +1,7 @@
 api/
 services/
 subscribers/
+strategies/
 utils/
 node_modules/
 docker-compose.yml
