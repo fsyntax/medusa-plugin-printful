@@ -11,3 +11,5 @@ yarn-error.log
 /subscribers
 /utils
 yarn.lock
+.pnp.loader.mjs
+.pnp.cjs
