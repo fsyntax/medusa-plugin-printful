@@ -15,9 +15,9 @@
     "medusa-plugin-other"
   ],
   "scripts": {
-    "build": "babel src --out-dir . --ignore **/__tests__ --extensions \".ts,.js\"",
+    "build": "babel src --out-dir . --extensions \".ts,.js\"",
     "prepare": "cross-env NODE_ENV=production npm run build",
-    "watch": "babel -w src --out-dir . --ignore **/__tests__ --extensions \".ts,.js\"",
+    "watch": "babel -w src --out-dir . --extensions \".ts,.js\"",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },

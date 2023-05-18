@@ -12,3 +12,5 @@ yarn-error.log
 /strategies
 /utils
 yarn.lock
+.pnp.loader.mjs
+.pnp.cjs
