@@ -50,6 +50,8 @@ To configure your Medusa server, simply add the following plguin configuration t
         printfulAccessToken: process.env.PRINTFUL_ACCESS_TOKEN, 
         storeId: process.env.PRINTFUL_STORE_ID, 
         backendUrl: process.env.BACKEND_URL, 
+        redisHost: process.env.REDIS_HOST, <-- NEW
+        redisPort: process.env.REDIS_PORT, <-- NEW
         enableWebhooks: true, 
         enableSync: true,
         batchSize: 3
@@ -65,16 +67,23 @@ To configure your Medusa server, simply add the following plguin configuration t
 - `storeId`: Store ID for Printful.
 - `backendUrl`: Base URL for the Medusa server (without trailing slash - i.e. `http://localhost:9000`
   or `https://api.your-domain.com`).
+- `redisHost`: Hostname for the Redis server.
+- `redisPort`: Port for the Redis server.
 - `enableWebhooks`: Enable or disable Printful webhook listener.
 - `enableSync`: Enable or disable product synchronization between Printful and Medusa.
-- `batchSize`: Number of products to fetch from Printful per batch. (Note that Printful has got an API rate limit of 120
-  requests per minute - since Printful products can have a lot of variants, it's recommended to keep this value low - I
-  couldn't test it with thousands of products)
+- `batchSize`:  This value is used to define how many jobs are added to the queue at once
 - `productTags`: Enable or disable wether product tags should be created and updated in Medusa
 - `productCategories`: Enable or disable wether product the product category should be added and updated (non-existent
   categories are going to be created) in Medusa.
 
 Please ensure that the `.env` variables for `printfulAccessToken`, `storeId`, and `backendUrl` are set accordingly.
+
+## Enhancements and Updates
+
+- The plugin now leverages BullMQ to handle synchronization jobs, ensuring efficient handling of multiple tasks.
+- It uses an exponential backoff algorithm to manage the retries of failed tasks. This strategy helps in reducing the load on the server and improving the overall efficiency of tasks execution.
+- The option `batchSize` now determines the number of jobs that are added to the queue at once, giving you more control over the load management.
+
 
 ### Custom Endpoints
 
@@ -97,6 +106,7 @@ authenticated users.
 - Listens to Printful webhook events and automatically syncs product information & orders between Printful and Medusa.
 - Can create regions in Medusa based on the regions available in Printful.
 - Can create product tags and categories in Medusa based on the tags and categories available in Printful.
+- Uses the BullMQ job queue to manage synchronization tasks, improving reliability and efficiency.
 
 Overall, Medusa-Plugin-Printful simplifies the management of your e-commerce store by providing seamless integration
 with the Printful fulfillment service.
