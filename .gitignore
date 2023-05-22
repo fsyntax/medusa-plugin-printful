@@ -9,5 +9,8 @@ yarn-error.log
 /api
 /services
 /subscribers
+/strategies
 /utils
 yarn.lock
+.pnp.loader.mjs
+.pnp.cjs

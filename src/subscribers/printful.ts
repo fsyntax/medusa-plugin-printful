@@ -11,6 +11,7 @@ class PrintfulSubscriber {
     private printfulService: any;
     private productVariantService: any;
     private paymentService: any;
+    private productsQueueService: any;
 
     constructor({
                     eventBusService,
@@ -21,7 +22,8 @@ class PrintfulSubscriber {
                     fulfillmentService,
                     printfulService,
                     productVariantService,
-                    paymentService
+                    paymentService,
+        productsQueueService
                 }) {
         this.printfulSyncService = printfulSyncService;
         this.productService = productService
@@ -31,6 +33,7 @@ class PrintfulSubscriber {
         this.printfulService = printfulService;
         this.productVariantService = productVariantService;
         this.paymentService = paymentService;
+        this.productsQueueService = productsQueueService;
 
         eventBusService.subscribe("printful.product_updated", this.handlePrintfulProductUpdated);
         eventBusService.subscribe("printful.product_deleted", this.handlePrintfulProductDeleted);
@@ -43,44 +46,45 @@ class PrintfulSubscriber {
         eventBusService.subscribe("order.updated", this.handleOrderUpdated);
         eventBusService.subscribe("order.completed", this.handleOrderCompleted);
         eventBusService.subscribe("order.canceled", this.handleOrderCanceled);
-        // eventBusService.subscribe("product.updated", this.handleProductUpdated);
     }
 
     handlePrintfulProductUpdated = async (data: any) => {
         console.log(`${blueBright("[medusa-plugin-printful]:")} Received a webhook event from Printful! [${blueBright(data.type)}]: \n`, data)
-        try {
-            const {
-                sync_product: printfulProduct,
-                sync_variants: printfulProductVariants
-            } = await this.printfulService.getSyncProduct(data.data.sync_product.id);
 
-            const listedProducts = await this.productService.list({external_id: printfulProduct.id});
-            if (listedProducts.length === 1) {
-                const medusaProduct = await this.productService.retrieve(listedProducts[0].id, {relations: ["variants", "options"]});
-                return await this.printfulService.updateMedusaProduct({
-                    sync_product: printfulProduct,
-                    sync_variants: printfulProductVariants,
-                    medusa_product: medusaProduct
-                }, "fromPrintful", null);
-
-            } else if (listedProducts.length > 1) {
-                console.log(`${red("[medusa-plugin-printful]:")} Found multiple products with the same external id '${red(printfulProduct.id)}' in Medusa, this should not happen!`)
-                return false;
-            } else if (listedProducts.length === 0) {
-                console.log(`${blueBright("[medusa-plugin-printful]:")} Product with external id '${blueBright(printfulProduct.id)}' not found in Medusa, creating new product...`)
-                try {
-                    return await this.printfulService.createMedusaProduct({
-                        sync_product: printfulProduct,
-                        sync_variants: printfulProductVariants
-                    })
-                } catch (e) {
-                    console.log(`${red("[medusa-plugin-printful]:")} Failed to create product in Medusa: `, e)
-                }
-
-            }
-        } catch (e: any) {
-            console.log(`${red("[medusa-plugin-printful]:")} Failed to update product in Medusa: `, e)
-        }
+         this.productsQueueService.addJob(data.data.sync_product);
+        // try {
+        //     const {
+        //         sync_product: printfulProduct,
+        //         sync_variants: printfulProductVariants
+        //     } = await this.printfulService.getSyncProduct(data.data.sync_product.id);
+        //
+        //     const listedProducts = await this.productService.list({external_id: printfulProduct.id});
+        //     if (listedProducts.length === 1) {
+        //         const medusaProduct = await this.productService.retrieve(listedProducts[0].id, {relations: ["variants", "options"]});
+        //         return await this.printfulService.updateMedusaProduct({
+        //             sync_product: printfulProduct,
+        //               sync_variants: printfulProductVariants,
+            //             medusa_product: medusaProduct
+        //         }, "fromPrintful", null);
+        //
+        //     } else if (listedProducts.length > 1) {
+        //         console.log(`${red("[medusa-plugin-printful]:")} Found multiple products with the same external id '${red(printfulProduct.id)}' in Medusa, this should not happen!`)
+        //         return false;
+        //     } else if (listedProducts.length === 0) {
+        //         console.log(`${blueBright("[medusa-plugin-printful]:")} Product with external id '${blueBright(printfulProduct.id)}' not found in Medusa, creating new product...`)
+        //         try {
+        //             return await this.printfulService.createMedusaProduct({
+        //                 sync_product: printfulProduct,
+        //                 sync_variants: printfulProductVariants
+        //             })
+        //         } catch (e) {
+        //             console.log(`${red("[medusa-plugin-printful]:")} Failed to create product in Medusa: `, e)
+        //         }
+        //
+        //     }
+        // } catch (e: any) {
+        //     console.log(`${red("[medusa-plugin-printful]:")} Failed to update product in Medusa: `, e)
+        // }
 
 
     }
@@ -141,7 +145,7 @@ class PrintfulSubscriber {
                         break;
                     }
                     break;
-                case "canceled" || "archived":
+                case "canceled":
                     // Handle canceled or archived orders
                     try {
                         return await this.orderService_.cancel(order.id)

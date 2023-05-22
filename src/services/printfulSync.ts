@@ -1,7 +1,12 @@
-import {ProductService, TransactionBaseService} from "@medusajs/medusa"
+import {
+    ProductService,
+    ProductVariantService, SalesChannelService, ShippingOptionService,
+    ShippingProfileService,
+    TransactionBaseService
+} from "@medusajs/medusa"
 import {EntityManager} from "typeorm"
 import {PrintfulClient} from "../utils/printful-request"
-import {blue, greenBright, red, yellow} from "colorette";
+import {blue, green, greenBright, red, yellow} from "colorette";
 
 class PrintfulSyncService extends TransactionBaseService {
     // @ts-ignore
@@ -11,15 +16,16 @@ class PrintfulSyncService extends TransactionBaseService {
     private productService: ProductService;
     private printfulClient: any;
     private readonly storeId: any;
-    private readonly enableSync: Boolean;
-    private productVariantService: any;
-    private shippingProfileService: any;
-    private salesChannelService: any;
-    private shippingOptionService: any;
+    private readonly enableSync: boolean;
+    private productVariantService: ProductVariantService;
+    private shippingProfileService: ShippingProfileService;
+    private salesChannelService: SalesChannelService;
+    private shippingOptionService: ShippingOptionService
     private regionService: any;
     private printfulService: any;
     private printfulWebhooksService: any;
     private readonly batchSize: number;
+    private productsQueueService: any;
 
     constructor(container, options) {
         super(container);
@@ -35,6 +41,7 @@ class PrintfulSyncService extends TransactionBaseService {
         this.enableSync = options.enableSync;
         this.printfulWebhooksService = container.printfulWebhooksService;
         this.batchSize = options.batchSize || 5;
+        this.productsQueueService = container.productsQueueService;
         if (this.enableSync) {
             setTimeout(async () => {
                 await this.syncPrintfulProducts()
@@ -53,74 +60,33 @@ class PrintfulSyncService extends TransactionBaseService {
     }
 
     async syncPrintfulProducts() {
-        const delay = 10000
-        console.info(`${greenBright("[medusa-plugin-printful]:")} Hey! Initial ${yellow("Printful synchronization")} has been started with a batch size of ${yellow(this.batchSize)}! This might take a while.. `)
+        const delay = 10000;
+        console.log(`${greenBright("[medusa-plugin-printful]:")} Hey! Initial ${yellow("Printful synchronization")} has been started with a batch size of ${yellow(this.batchSize)}! This might take a while.. `);
 
-        const {result: syncableProducts} = await this.printfulClient.get("store/products", {store_id: this.storeId});
-
+        const { result: syncableProducts } = await this.printfulClient.get("store/products", {store_id: this.storeId});
 
         if (syncableProducts.length > 0) {
+            console.log(`${blue("[medusa-plugin-printful]: ")} Found ${syncableProducts.length} products to sync!`);
+            let jobsData = [];
             for (let i = 0; i < syncableProducts.length; i += this.batchSize) {
                 const batch = syncableProducts.slice(i, i + this.batchSize);
-                await Promise.all(batch.map(async product => {
-                    const existingProduct = await this.checkIfProductExists(product.id.toString());
-                    const {
-                        result: {
-                            sync_product: printfulProduct,
-                            sync_variants: printfulProductVariants
-                        }
-                    } = await this.printfulClient.get(`store/products/${product.id}`, {store_id: this.storeId});
+                jobsData = jobsData.concat(batch.map(product => ({
+                    name: `sync-${product.id}`,
+                    data: product
+                })));
 
-                    if (existingProduct) {
-                        console.log(`${blue("[medusa-plugin-printful]:")} Product ${blue(`${product.name}`)} already exists in Medusa! Preparing to update...️`)
-                        return await this.printfulService.updateMedusaProduct({
-                            sync_product: printfulProduct,
-                            sync_variants: printfulProductVariants,
-                            medusa_product: existingProduct
-                        }, "fromPrintful", null);
-                    } else {
-                        console.log(`${blue("[medusa-plugin-printful]:")} Product ${blue(`${product.name}`)} does not exist in Medusa! Preparing to create...️`)
-                        return await this.printfulService.createMedusaProduct({
-                            sync_product: printfulProduct,
-                            sync_variants: printfulProductVariants
-                        });
-                    }
-
-                }));
-
-                if (i + this.batchSize < syncableProducts.length) {
+                if (jobsData.length >= this.batchSize || i + this.batchSize >= syncableProducts.length) {
+                    console.log(`${blue("[medusa-plugin-printful]: ")} Adding ${jobsData.length} jobs to the queue.`);
+                    await this.productsQueueService.addBulkJobs(jobsData);
+                    console.log(`${green("[medusa-plugin-printful]: ")} Successfully added ${jobsData.length} jobs to the queue.`);
+                    jobsData = [];
                     await new Promise(resolve => setTimeout(resolve, delay));
                 }
             }
-            return "Syncing done!";
         }
+        console.log(`${green("[medusa-plugin-printful]: ")} Finished scheduling Printful product synchronization jobs.`);
     }
 
-    async addProductOptions(productId, optionTitle) {
-        try {
-            await this.productService.addOption(productId, optionTitle);
-        } catch (e) {
-            console.log("An error occurred while trying to an option!", e);
-        }
-    }
-
-    async addVariantOptionValue(variantId, optionId, value) {
-        try {
-            await this.productVariantService.addOptionValue(variantId, optionId, value);
-        } catch (e) {
-            console.log("An error occurred while trying to add option value!", e);
-        }
-    }
-
-    async updateVariantCurrencyPrice(sku: string, price: string) {
-        const {id} = await this.productVariantService.retrieveBySKU(sku);
-        // convert price string to number
-        const priceNumber = parseInt(price, 10);
-        return await this.productVariantService.setCurrencyPrice(id, {
-            amount: priceNumber * 100,
-            currency_code: "EUR"
-        });
-    }
 
     async createPrintfulRegions() {
 
@@ -169,19 +135,6 @@ class PrintfulSyncService extends TransactionBaseService {
         console.log("Successfully created all regions available from Printful! ✅")
         return {printfulCountries, createdRegions};
     }
-
-
-    async checkIfProductExists(id: string) {
-        try {
-            const product = await this.productService.retrieveByExternalId(id, {relations: ['variants', 'options']});
-            if (product) {
-                return product;
-            }
-        } catch (e) {
-            return false;
-        }
-    }
-
 
 }
 
