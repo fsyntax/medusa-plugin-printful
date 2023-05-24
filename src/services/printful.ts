@@ -33,6 +33,7 @@ class PrintfulService extends TransactionBaseService {
     private readonly productCategories: boolean;
     private productCategoryService: any;
     private readonly backoffOptions: IBackOffOptions;
+    private categoryAliases: any;
 
     constructor(container, options) {
         super(container);
@@ -49,6 +50,7 @@ class PrintfulService extends TransactionBaseService {
         this.manager_ = container.manager;
         this.productTags = options.productTags;
         this.productCategories = options.productCategories;
+        this.categoryAliases = options.categoryAliases;
 
         this.backoffOptions = {
             numOfAttempts: 10,
@@ -534,6 +536,47 @@ class PrintfulService extends TransactionBaseService {
             }
         });
     }
+
+    // async buildProductCategory(printfulCatalogProduct: any) {
+    //     const categories = printfulCatalogProduct.map(({parentProduct}) => {
+    //         return {
+    //             main_category_id: parentProduct.main_category_id,
+    //         }
+    //     })
+    //
+    //     try {
+    //         const result = await backOff(async () => {
+    //             const {
+    //                 code,
+    //                 result
+    //             } = await this.printfulClient.get(`categories/${categories[0].main_category_id}`)
+    //             return {code, result};
+    //         }, this.backoffOptions);
+    //
+    //         if (result.code === 200) {
+    //             const medusaCategory = await this.productCategoryService.listAndCount({q: result.result.category.title});
+    //             if (medusaCategory[0].length === 0) {
+    //                 console.log(`${blue('[medusa-plugin-printful]:')} Category '${blue(result.result.category.title)}' not found in Medusa! Attempting to create..`)
+    //                 return await this.atomicPhase_(async (manager) => {
+    //                     try {
+    //                         const newCategory = await this.productCategoryService.create({name: result.result.category.title})
+    //                         console.log(`${green('[medusa-plugin-printful]:')} Successfully created category '${green(result.result.category.title)}' in Medusa!`)
+    //                         return [{id: newCategory.id}]
+    //                     } catch (e) {
+    //                         console.error(`${red('[medusa-plugin-printful]:')} Failed creating category '${red(result.result.category.title)}' in Medusa: `, e);
+    //                     }
+    //                 })
+    //             } else if (medusaCategory[0].length === 1) {
+    //                 console.log(`${blue('[medusa-plugin-printful]:')} Category '${blue(result.result.category.title)}' found in Medusa!`)
+    //                 return [{id: medusaCategory[0][0].id}]
+    //             }
+    //             return []
+    //         }
+    //     } catch (e) {
+    //         console.error(`${red('[medusa-plugin-printful]:')} Failed getting category from Printful, skipping this operation! `, e.result);
+    //         return []
+    //     }
+    // }
     async buildProductCategory(printfulCatalogProduct: any) {
         const categories = printfulCatalogProduct.map(({parentProduct}) => {
             return {
@@ -551,20 +594,36 @@ class PrintfulService extends TransactionBaseService {
             }, this.backoffOptions);
 
             if (result.code === 200) {
-                const medusaCategory = await this.productCategoryService.listAndCount({q: result.result.category.title});
+                console.log(`${blue('[medusa-plugin-printful]:')} Checking category alias for Printful category '${blue(result.result.category.title)}'..`)
+                let categoryTitle = this.categoryAliases.exactMatch[result.result.category.title] || result.result.category.title;
+
+                // If an exact alias was not found, check the inexactMatch aliases
+                if (categoryTitle === result.result.category.title) {
+                    for (const pattern in this.categoryAliases.inexactMatch) {
+                        const regex = new RegExp(pattern.replace(/\*/g, '.*'), 'i'); // replace wildcard (*) with regex equivalent (.*)
+                        if (regex.test(categoryTitle)) {
+                            categoryTitle = this.categoryAliases.inexactMatch[pattern];
+                            break;
+                        }
+                    }
+                }
+                if (categoryTitle !== result.result.category.title)
+                    console.log(`${blue('[medusa-plugin-printful]:')} Category alias for Printful category '${blue(result.result.category.title)}' is '${blue(categoryTitle)}'`)
+
+                const medusaCategory = await this.productCategoryService.listAndCount({q: categoryTitle});
                 if (medusaCategory[0].length === 0) {
-                    console.log(`${blue('[medusa-plugin-printful]:')} Category '${blue(result.result.category.title)}' not found in Medusa! Attempting to create..`)
+                    console.log(`${blue('[medusa-plugin-printful]:')} Category '${blue(categoryTitle)}' not found in Medusa! Attempting to create..`)
                     return await this.atomicPhase_(async (manager) => {
                         try {
-                            const newCategory = await this.productCategoryService.create({name: result.result.category.title})
-                            console.log(`${green('[medusa-plugin-printful]:')} Successfully created category '${green(result.result.category.title)}' in Medusa!`)
+                            const newCategory = await this.productCategoryService.create({name: categoryTitle})
+                            console.log(`${green('[medusa-plugin-printful]:')} Successfully created category '${green(categoryTitle)}' in Medusa!`)
                             return [{id: newCategory.id}]
                         } catch (e) {
-                            console.error(`${red('[medusa-plugin-printful]:')} Failed creating category '${red(result.result.category.title)}' in Medusa: `, e);
+                            console.error(`${red('[medusa-plugin-printful]:')} Failed creating category '${red(categoryTitle)}' in Medusa: `, e);
                         }
                     })
                 } else if (medusaCategory[0].length === 1) {
-                    console.log(`${blue('[medusa-plugin-printful]:')} Category '${blue(result.result.category.title)}' found in Medusa!`)
+                    console.log(`${blue('[medusa-plugin-printful]:')} Category '${blue(categoryTitle)}' found in Medusa!`)
                     return [{id: medusaCategory[0][0].id}]
                 }
                 return []
@@ -574,6 +633,7 @@ class PrintfulService extends TransactionBaseService {
             return []
         }
     }
+
 
     async updatePrintfulProduct(data: any) {
 
