@@ -56,7 +56,18 @@ To configure your Medusa server, simply add the following plguin configuration t
         enableSync: true,
         batchSize: 3
         productTags: true,
-        productCategories: true
+        productCategories: true,
+        categoryAliases: {
+            exactMatch: {
+                "All shirts": "T-shirts",
+                "Tumblers": "Drinkware",
+                "Mugs": "Drinkware",
+            },
+            inexactMatch: {
+                "*shirt*": "T-shirts",
+                "*cap": "Caps"
+            }
+        }
     }
 }
 ```
@@ -70,22 +81,73 @@ To configure your Medusa server, simply add the following plguin configuration t
 - `redisHost`: Hostname for the Redis server.
 - `redisPort`: Port for the Redis server.
 - `enableWebhooks`: Enable or disable Printful webhook listener.
-- `enableSync`: Enable or disable product synchronization between Printful and Medusa.
+- `enableSync`: Enable an **initial Product Sync on a server startup**. (This is useful if you want to sync your
+  products
+  with Medusa for the first time - continous synchronization is enabled through webhooks).
 - `batchSize`:  This value is used to define how many jobs are added to the queue at once
 - `productTags`: Enable or disable wether product tags should be created and updated in Medusa
 - `productCategories`: Enable or disable wether product the product category should be added and updated (non-existent
   categories are going to be created) in Medusa.
+- `categoryAliases`: This option allows you to map Printful's product categories to your preferred custom categories.
+  See the description below.
 
 Please ensure that the `.env` variables for `printfulAccessToken`, `storeId`, and `backendUrl` are set accordingly.
+
+### Category Aliases
+
+As already mentioned, the categoryAliases option allows for a custom category title mapping. This is useful in cases
+where Printful's category naming doesn't fit your shop's naming conventions or if you simply want to override the
+category names.
+
+you can define `categoryAliases` using two different matching strategies: `exactMatch` and `inexactMatch`.
+
+#### exactMatch
+
+The `exactMatch` strategy allows you to define a mapping for exact category names. This means that the plugin will only
+map the category if the name matches exactly.
+For example:
+
+```
+categoryAliases: {
+    exactMatch: {
+        "All shirts": "T-shirts",
+        "Tumblers": "Drinkware",
+        "Mugs": "Drinkware",
+    }
+}
+```
+
+In this example, the plugin will map the category `All shirts` to `T-shirts` and `Tumblers` and `Mugs` to `Drinkware`.
+
+#### inexactMatch
+
+The `inexactMatch` strategy allows you to define a mapping for category names that match a certain pattern. This means
+that the plugin will map the category if the name matches the pattern. For example:
+
+```
+categoryAliases: {
+    inexactMatch: {
+        "*shirt*": "T-shirts",
+        "*cap": "Caps"
+    }
+}
+```
+
+In this example, the plugin will map all categories that contain the word `shirt` to `T-shirts` and all categories that
+end with `cap` to `Caps`. Note the use of the `*` wildcard character, wich can stand for any number of characters and
+any group of characters.
+
+> #### Remember: if both strategies match a category, the `exactMatch` strategy will take precedence over the `inexactMatch` strategy.
 
 ## Enhancements and Updates
 
 - The plugin now leverages BullMQ to handle synchronization jobs, ensuring efficient handling of multiple tasks.
-- It uses an exponential backoff algorithm to manage the retries of failed tasks. This strategy helps in reducing the load on the server and improving the overall efficiency of tasks execution.
-- The option `batchSize` now determines the number of jobs that are added to the queue at once, giving you more control over the load management.
+- It uses an exponential backoff algorithm to manage the retries of failed tasks. This strategy helps in reducing the
+  load on the server and improving the overall efficiency of tasks execution.
+- The option `batchSize` now determines the number of jobs that are added to the queue at once, giving you more control
+  over the load management.
 
-
-### Custom Endpoints
+### Custom Endpoints [eventually gets deprecated & removed]
 
 In addition to the default functionality, the plugin comes with a few custom endpoints that can be used to manually
 manage the integration:
