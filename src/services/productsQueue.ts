@@ -1,6 +1,9 @@
 import {Queue, Worker, Job} from 'bullmq';
 import {TransactionBaseService, EventBusService, ProductService, Logger} from "@medusajs/medusa";
 import {blue, blueBright, yellow} from "colorette";
+import {ConnectionOptions} from "bullmq";
+
+const redisUrlParse = require('redis-url-parse');
 
 class ProductsQueueService extends TransactionBaseService {
     private eventBusService_: EventBusService;
@@ -19,15 +22,10 @@ class ProductsQueueService extends TransactionBaseService {
         this.manager_ = container.manager;
         this.logger_ = container.logger;
         this.redisURL_ = options.redisURL;
-        const redisConfig = this.parseRedisURL(this.redisURL_);
-
+        const redisConfig = redisUrlParse(this.redisURL_);
+        console.log(redisConfig)
         this.queue_ = new Queue('printful-products', {
-            connection: {
-                host: redisConfig.host,
-                port: redisConfig.port,
-                password: redisConfig.password,
-                db: redisConfig.db,
-            },
+            connection: redisConfig,
         });
         this.queue_.obliterate().then(() => {
             console.log(`${blueBright("[medusa-plugin-printful]:")} Queue obliterated!`)

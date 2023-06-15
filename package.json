@@ -36,6 +36,7 @@
     "lodash": "^4.17.21",
     "medusa-core-utils": "^1.1.39",
     "medusa-interfaces": "^1.3.6",
+    "redis-url-parse": "^2.0.0",
     "typeorm": "0.3.11"
   },
   "devDependencies": {
