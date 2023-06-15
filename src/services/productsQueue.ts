@@ -29,7 +29,6 @@ class ProductsQueueService extends TransactionBaseService {
                 db: redisConfig.db,
             },
         });
-        console.log(this.queue_)
         this.queue_.obliterate().then(() => {
             console.log(`${blueBright("[medusa-plugin-printful]:")} Queue obliterated!`)
         })
