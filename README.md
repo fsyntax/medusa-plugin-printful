@@ -50,13 +50,12 @@ To configure your Medusa server, simply add the following plguin configuration t
         printfulAccessToken: process.env.PRINTFUL_ACCESS_TOKEN, 
         storeId: process.env.PRINTFUL_STORE_ID, 
         backendUrl: process.env.BACKEND_URL, 
-        redisHost: process.env.REDIS_HOST, <-- NEW
-        redisPort: process.env.REDIS_PORT, <-- NEW
         enableWebhooks: true, 
         enableSync: true,
         batchSize: 3
         productTags: true,
-        productCategories: true
+        productCategories: true,
+        redisURL: REDIS_URL or process.env.REDIS_URL,
     }
 }
 ```
@@ -67,8 +66,6 @@ To configure your Medusa server, simply add the following plguin configuration t
 - `storeId`: Store ID for Printful.
 - `backendUrl`: Base URL for the Medusa server (without trailing slash - i.e. `http://localhost:9000`
   or `https://api.your-domain.com`).
-- `redisHost`: Hostname for the Redis server.
-- `redisPort`: Port for the Redis server.
 - `enableWebhooks`: Enable or disable Printful webhook listener.
 - `enableSync`: Enable or disable product synchronization between Printful and Medusa.
 - `batchSize`:  This value is used to define how many jobs are added to the queue at once
@@ -81,9 +78,10 @@ Please ensure that the `.env` variables for `printfulAccessToken`, `storeId`, an
 ## Enhancements and Updates
 
 - The plugin now leverages BullMQ to handle synchronization jobs, ensuring efficient handling of multiple tasks.
-- It uses an exponential backoff algorithm to manage the retries of failed tasks. This strategy helps in reducing the load on the server and improving the overall efficiency of tasks execution.
-- The option `batchSize` now determines the number of jobs that are added to the queue at once, giving you more control over the load management.
-
+- It uses an exponential backoff algorithm to manage the retries of failed tasks. This strategy helps in reducing the
+  load on the server and improving the overall efficiency of tasks execution.
+- The option `batchSize` now determines the number of jobs that are added to the queue at once, giving you more control
+  over the load management.
 
 ### Custom Endpoints
 
