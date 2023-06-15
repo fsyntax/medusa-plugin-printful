@@ -23,10 +23,11 @@ class ProductsQueueService extends TransactionBaseService {
         this.logger_ = container.logger;
         this.redisURL_ = options.redisURL;
         const redisConfig = redisUrlParse(this.redisURL_);
-        console.log(redisConfig)
         this.queue_ = new Queue('printful-products', {
             connection: redisConfig,
+
         });
+        console.log(this.queue_)
         this.queue_.obliterate().then(() => {
             console.log(`${blueBright("[medusa-plugin-printful]:")} Queue obliterated!`)
         })
@@ -67,6 +68,7 @@ class ProductsQueueService extends TransactionBaseService {
                 }
             },
             {
+                connection: redisConfig,
                 concurrency: 1,
                 limiter: {max: 300, duration: 1000},
 
