@@ -117,7 +117,7 @@ class PrintfulService extends TransactionBaseService {
 
     async createMedusaProduct(rawProduct: any) {
 
-        const variantChunks = chunk(rawProduct.sync_variants, 10); // Tweak this number as needed
+        const variantChunks = chunk(rawProduct.sync_variants, 10);
 
         return await this.atomicPhase_(async (manager) => {
             const {
@@ -355,11 +355,9 @@ class PrintfulService extends TransactionBaseService {
                 const productObj: UpdateProductInput = {
                     title: printfulProduct.name,
                     handle: kebabCase(printfulProduct.name),
-                    thumbnail: printfulProduct.thumbnail_url,
                     external_id: printfulProduct.id,
                     tags: this.productTags ? productTags : [],
                     categories: this.productCategories ? productCategories : [],
-                    images: this.buildProductImages(printfulProductVariant),
                     metadata: {
                         printful_id: printfulProduct.id,
                     }
