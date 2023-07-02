@@ -1,4 +1,10 @@
-import {OrderService, ProductService, TransactionBaseService} from "@medusajs/medusa"
+import {
+    OrderService,
+    ProductCategoryService,
+    ProductService, ProductVariantService, SalesChannelService,
+    ShippingProfileService,
+    TransactionBaseService
+} from "@medusajs/medusa"
 import {EntityManager} from "typeorm"
 import {PrintfulClient} from "../utils/printful-request"
 import {
@@ -11,6 +17,7 @@ import {kebabCase, capitalize, chunk, last} from "lodash";
 import {backOff, IBackOffOptions} from "exponential-backoff";
 
 import {blue, green, greenBright, red, yellow, yellowBright} from "colorette";
+import {FulfillmentService } from "medusa-interfaces";
 
 
 class PrintfulService extends TransactionBaseService {
@@ -20,37 +27,41 @@ class PrintfulService extends TransactionBaseService {
     // @ts-ignore
     protected transactionManager_: EntityManager
     private productService: ProductService;
+    private productCategoryService: ProductCategoryService;
+    private productVariantService: ProductVariantService;
     private orderService: OrderService;
-    private printfulClient: any;
-    private readonly storeId: any;
-    private readonly printfulAccessToken: any;
-    private fulfillmentService: any;
-    private productVariantService: any;
-    private salesChannelService: any;
-    private shippingProfileService: any;
-    private apiKey: any;
+    private fulfillmentService: any
+    private salesChannelService: SalesChannelService;
+    private shippingProfileService: ShippingProfileService;
+
+    private readonly backoffOptions: IBackOffOptions;
+    private printfulClient: PrintfulClient;
+    private apiKey: string;
+    private categoryAliases: object;
+    private readonly storeId: string;
+    private readonly printfulAccessToken: string;
     private readonly productTags: boolean;
     private readonly productCategories: boolean;
-    private productCategoryService: any;
-    private readonly backoffOptions: IBackOffOptions;
-    private categoryAliases: any;
+    private readonly confirmOrder: boolean;
 
     constructor(container, options) {
         super(container);
-        this.productService = container.productService;
-        this.orderService = container.orderService;
-        this.fulfillmentService = container.fulfillmentService;
-        this.productVariantService = container.productVariantService;
-        this.printfulClient = new PrintfulClient(options.printfulAccessToken);
-        this.shippingProfileService = container.shippingProfileService;
-        this.salesChannelService = container.salesChannelService;
-        this.productCategoryService = container.productCategoryService;
-        this.storeId = options.storeId;
-        this.apiKey = options.printfulAccessToken;
         this.manager_ = container.manager;
+        this.productService = container.productService;
+        this.productVariantService = container.productVariantService;
+        this.productCategoryService = container.productCategoryService;
+        this.fulfillmentService = container.fulfillmentService;
+        this.orderService = container.orderService;
+        this.salesChannelService = container.salesChannelService;
+        this.shippingProfileService = container.shippingProfileService;
+
+        this.printfulClient = new PrintfulClient(options.printfulAccessToken);
+        this.apiKey = options.printfulAccessToken;
+        this.storeId = options.storeId;
         this.productTags = options.productTags;
         this.productCategories = options.productCategories;
-        this.categoryAliases = options.categoryAliases;
+        this.categoryAliases = options.categoryAliases
+        this.confirmOrder = options.confirmOrder || false;
 
         this.backoffOptions = {
             numOfAttempts: 10,
@@ -60,7 +71,6 @@ class PrintfulService extends TransactionBaseService {
             jitter: "full",
             maxDelay: 60000,
             retry: (e: any, attempts: number) => {
-                // You might want to adjust this line depending on how you access the status code in the error object.
                 const status = e.response?.status || e.code
                 if (status === 429) {
                     console.error(`${red('[medusa-plugin-printful]:')} Rate limit error occurred while trying to create a product! Attempt ${attempts} of ${this.backoffOptions.numOfAttempts}. Will retry...`);
@@ -535,46 +545,6 @@ class PrintfulService extends TransactionBaseService {
         });
     }
 
-    // async buildProductCategory(printfulCatalogProduct: any) {
-    //     const categories = printfulCatalogProduct.map(({parentProduct}) => {
-    //         return {
-    //             main_category_id: parentProduct.main_category_id,
-    //         }
-    //     })
-    //
-    //     try {
-    //         const result = await backOff(async () => {
-    //             const {
-    //                 code,
-    //                 result
-    //             } = await this.printfulClient.get(`categories/${categories[0].main_category_id}`)
-    //             return {code, result};
-    //         }, this.backoffOptions);
-    //
-    //         if (result.code === 200) {
-    //             const medusaCategory = await this.productCategoryService.listAndCount({q: result.result.category.title});
-    //             if (medusaCategory[0].length === 0) {
-    //                 console.log(`${blue('[medusa-plugin-printful]:')} Category '${blue(result.result.category.title)}' not found in Medusa! Attempting to create..`)
-    //                 return await this.atomicPhase_(async (manager) => {
-    //                     try {
-    //                         const newCategory = await this.productCategoryService.create({name: result.result.category.title})
-    //                         console.log(`${green('[medusa-plugin-printful]:')} Successfully created category '${green(result.result.category.title)}' in Medusa!`)
-    //                         return [{id: newCategory.id}]
-    //                     } catch (e) {
-    //                         console.error(`${red('[medusa-plugin-printful]:')} Failed creating category '${red(result.result.category.title)}' in Medusa: `, e);
-    //                     }
-    //                 })
-    //             } else if (medusaCategory[0].length === 1) {
-    //                 console.log(`${blue('[medusa-plugin-printful]:')} Category '${blue(result.result.category.title)}' found in Medusa!`)
-    //                 return [{id: medusaCategory[0][0].id}]
-    //             }
-    //             return []
-    //         }
-    //     } catch (e) {
-    //         console.error(`${red('[medusa-plugin-printful]:')} Failed getting category from Printful, skipping this operation! `, e.result);
-    //         return []
-    //     }
-    // }
     async buildProductCategory(printfulCatalogProduct: any) {
         const categories = printfulCatalogProduct.map(({parentProduct}) => {
             return {
@@ -772,7 +742,7 @@ class PrintfulService extends TransactionBaseService {
             const order = await this.printfulClient.post("orders", {
                 ...orderObj,
                 store_id: this.storeId,
-                confirm: false
+                confirm: this.confirmOrder
             });
             if (order.code === 200) {
                 console.log(`${green("[medusa-plugin-printful]:")} Successfully created the order on Printful! `, order.result)
