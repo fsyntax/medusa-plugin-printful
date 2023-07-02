@@ -758,7 +758,7 @@ class PrintfulService extends TransactionBaseService {
             items: data.items.map((item) => {
                 return {
                     name: item.variant.title,
-                    external_id: item.id,
+                    external_id: item.variant_id,
                     variant_id: item.variant.metadata.printful_catalog_variant_id,
                     sync_variant_id: item.variant.metadata.printful_id,
                     quantity: item.quantity,
