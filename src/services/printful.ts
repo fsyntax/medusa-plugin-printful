@@ -43,6 +43,7 @@ class PrintfulService extends TransactionBaseService {
     private readonly productTags: boolean;
     private readonly productCategories: boolean;
     private readonly confirmOrder: boolean;
+    private shippingOptionService: any;
 
     constructor(container, options) {
         super(container);
@@ -54,6 +55,7 @@ class PrintfulService extends TransactionBaseService {
         this.orderService = container.orderService;
         this.salesChannelService = container.salesChannelService;
         this.shippingProfileService = container.shippingProfileService;
+        this.shippingOptionService = container.shippingOptionService;
 
         this.printfulClient = new PrintfulClient(options.printfulAccessToken);
         this.apiKey = options.printfulAccessToken;
@@ -711,33 +713,37 @@ class PrintfulService extends TransactionBaseService {
     async createPrintfulOrder(data: any) {
         console.log(`${blue('[medusa-plugin-printful]:')} Creating order with order_id '${blue(data.id)}' in Printful: `, data)
 
-        const orderObj = {
-            external_id: data.id,
-            shipping: data.shipping_methods[0].shipping_option_id,
-            recipient: {
-                name: data.shipping_address.first_name + " " + data.shipping_address.last_name,
-                address1: data.shipping_address.address_1,
-                address2: data.shipping_address.address_2 ?? '',
-                city: data.shipping_address.city,
-                state_code: data.shipping_address.province,
-                country_code: data.shipping_address.country_code,
-                zip: data.shipping_address.postal_code,
-                email: data.email,
-                phone: data.shipping_address.phone ?? '',
-            },
-            items: data.items.map((item) => {
-                return {
-                    name: item.variant.title,
-                    external_id: item.variant_id,
-                    variant_id: item.variant.metadata.printful_catalog_variant_id,
-                    sync_variant_id: item.variant.metadata.printful_id,
-                    quantity: item.quantity,
-                    price: `${(item.unit_price / 100).toFixed(2)}`.replace('.', '.'),
-                    retail_price: `${(item.unit_price / 100).toFixed(2)}`.replace('.', '.'),
-                }
-            })
-        }
+
         try {
+            // TODO: Check if this is really necessary
+            const {data: { id: printfulShippingId }} = await this.shippingOptionService.retrieve(data.shipping_methods[0].shipping_option_id)
+
+            const orderObj = {
+                external_id: data.id,
+                shipping: printfulShippingId,
+                recipient: {
+                    name: data.shipping_address.first_name + " " + data.shipping_address.last_name,
+                    address1: data.shipping_address.address_1,
+                    address2: data.shipping_address.address_2 ?? '',
+                    city: data.shipping_address.city,
+                    state_code: data.shipping_address.province,
+                    country_code: data.shipping_address.country_code,
+                    zip: data.shipping_address.postal_code,
+                    email: data.email,
+                    phone: data.shipping_address.phone ?? '',
+                },
+                items: data.items.map((item) => {
+                    return {
+                        name: item.variant.title,
+                        external_id: item.variant_id,
+                        variant_id: item.variant.metadata.printful_catalog_variant_id,
+                        sync_variant_id: item.variant.metadata.printful_id,
+                        quantity: item.quantity,
+                        price: `${(item.unit_price / 100).toFixed(2)}`.replace('.', '.'),
+                        retail_price: `${(item.unit_price / 100).toFixed(2)}`.replace('.', '.'),
+                    }
+                })
+            }
             console.log(`${blue("[medusa-plugin-printful]:")} Trying to send the order to printful with the following data: `, orderObj)
             const order = await this.printfulClient.post("orders", {
                 ...orderObj,
