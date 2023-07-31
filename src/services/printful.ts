@@ -713,7 +713,7 @@ class PrintfulService extends TransactionBaseService {
 
         const orderObj = {
             external_id: data.id,
-            shipping: data.shipping_methods[0].shipping_option.data.id,
+            shipping: data.shipping_methods[0].shipping_option_id,
             recipient: {
                 name: data.shipping_address.first_name + " " + data.shipping_address.last_name,
                 address1: data.shipping_address.address_1,
@@ -746,9 +746,11 @@ class PrintfulService extends TransactionBaseService {
             });
             if (order.code === 200) {
                 console.log(`${green("[medusa-plugin-printful]:")} Successfully created the order on Printful! `, order.result)
+                return order;
             }
         } catch (e) {
             console.log(`${red("[medusa-plugin-printful]:")} There was an error when trying to create the order on Printful! `, e)
+            return e
         }
     }
 
