@@ -231,7 +231,7 @@ class PrintfulSubscriber {
     }
     handleOrderCreated = async (data: any) => {
         console.log("From handleOrderCreated - processing following event: ", data)
-        const order = await this.orderService_.retrieve(data.id, {relations: ["items", "shipping_methods", "shipping_address"]});
+        const order = await this.orderService_.retrieve(data.id, { relations: ["items","items.variant", "shipping_methods", "shipping_address"] });
         console.log("Retrieved order: ", order)
         if (order) {
             await this.printfulService.createPrintfulOrder(order)

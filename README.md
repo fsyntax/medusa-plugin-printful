@@ -56,6 +56,7 @@ To configure your Medusa server, simply add the following plguin configuration t
         productTags: true,
         productCategories: true,
         redisURL: REDIS_URL or process.env.REDIS_URL,
+        confirmOrder: true
     }
 }
 ```
@@ -72,6 +73,7 @@ To configure your Medusa server, simply add the following plguin configuration t
 - `productTags`: Enable or disable wether product tags should be created and updated in Medusa
 - `productCategories`: Enable or disable wether product the product category should be added and updated (non-existent
   categories are going to be created) in Medusa.
+- `confirmOrder`: Enable or disable if the order should be confirmed straight away when sending it to Printful, or if the order should be sent as a draft (wich requires a manual confirmation in the Printful Dashboard). Defaults to `false`. 
 
 Please ensure that the `.env` variables for `printfulAccessToken`, `storeId`, and `backendUrl` are set accordingly.
 

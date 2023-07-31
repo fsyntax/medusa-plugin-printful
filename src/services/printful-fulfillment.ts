@@ -1,7 +1,7 @@
-import {FulfillmentService} from "medusa-interfaces";
-import {PrintfulClient} from "../utils/printful-request"
-import {Fulfillment} from "@medusajs/medusa";
-import {toUpper} from "lodash";
+import { FulfillmentService } from "medusa-interfaces";
+import { PrintfulClient } from "../utils/printful-request"
+import { Fulfillment } from "@medusajs/medusa";
+import { toUpper } from "lodash";
 
 class PrintfulFulfillmentService extends FulfillmentService {
     static identifier = "printful";
@@ -22,7 +22,6 @@ class PrintfulFulfillmentService extends FulfillmentService {
     }
 
     async getFulfillmentOptions() {
-        console.log("About to create fulfillment options")
         return [
             {
                 id: "STANDARD",
