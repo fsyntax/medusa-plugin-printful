@@ -1,6 +1,6 @@
 {
   "name": "medusa-plugin-printful",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "packageManager": "yarn@1.22.19",
   "description": "A Medusa plugin that enables Printful as a fulfillment provider and provides product and order synchronization.",
   "author": "Marco Freiberger <marco@freibergersyntax.dev>",
