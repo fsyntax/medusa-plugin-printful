@@ -2,6 +2,7 @@ import { FulfillmentService } from "medusa-interfaces";
 import { PrintfulClient } from "../utils/printful-request"
 import { Fulfillment } from "@medusajs/medusa";
 import { toUpper } from "lodash";
+import {blue, green} from "colorette";
 
 class PrintfulFulfillmentService extends FulfillmentService {
     static identifier = "printful";
@@ -50,9 +51,10 @@ class PrintfulFulfillmentService extends FulfillmentService {
         return {...data};
     }
 
-    async createFulfillment(data, fulfillmentItems, fromOrder, fulfillment) {
-        console.log("createFulfillment", data, fulfillmentItems, fromOrder, fulfillment)
-        return Promise.resolve({})
+    async createFulfillment( methodData, fulfillmentItems, fromOrder, fulfillment) {
+        console.log(`${blue("[medusa-plugin-printful]:")} Trying to confirm draft order for fulfillment `, fromOrder.id)
+         await this.printfulService.confirmDraftForFulfillment(fromOrder.id)
+
     }
 
     canCalculate(data) {

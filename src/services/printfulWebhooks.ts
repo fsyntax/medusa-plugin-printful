@@ -31,7 +31,9 @@ class PrintfulWebhooksService extends TransactionBaseService {
 
     async createWebhooks() {
         console.log(`${greenBright("[medusa-plugin-printful]:")} Creating Printful Webhooks!`)
+
         const currentWebhookConfig = await this.printfulClient.get("webhooks", {store_id: this.storeId});
+
         console.log(`${greenBright("[medusa-plugin-printful]: ")} Your current Printful Webhook configuration: `, currentWebhookConfig)
         if (currentWebhookConfig.url !== `${this.backendUrl}/printful/webhook`) {
             const webhookTypes = [

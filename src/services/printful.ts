@@ -1,7 +1,10 @@
 import {
+    Order,
     OrderService,
     ProductCategoryService,
-    ProductService, ProductVariantService, SalesChannelService,
+    ProductService,
+    ProductVariantService,
+    SalesChannelService,
     ShippingProfileService,
     TransactionBaseService
 } from "@medusajs/medusa"
@@ -13,11 +16,10 @@ import {
     FulFillmentItemType
 } from "@medusajs/medusa/dist/types/fulfillment";
 import {CreateProductInput, UpdateProductInput} from "@medusajs/medusa/dist/types/product";
-import {kebabCase, capitalize, chunk, last} from "lodash";
+import {capitalize, chunk, kebabCase, last} from "lodash";
 import {backOff, IBackOffOptions} from "exponential-backoff";
 
 import {blue, green, greenBright, red, yellow, yellowBright} from "colorette";
-import {FulfillmentService } from "medusa-interfaces";
 
 
 class PrintfulService extends TransactionBaseService {
@@ -710,13 +712,12 @@ class PrintfulService extends TransactionBaseService {
         return orderCosts;
     }
 
-    async createPrintfulOrder(data: any) {
+    async createPrintfulOrder(data: Order) {
         console.log(`${blue('[medusa-plugin-printful]:')} Creating order with order_id '${blue(data.id)}' in Printful: `, data)
-
 
         try {
             // TODO: Check if this is really necessary
-            const {data: { id: printfulShippingId }} = await this.shippingOptionService.retrieve(data.shipping_methods[0].shipping_option_id)
+            const { data: { id: printfulShippingId } } = await this.shippingOptionService.retrieve(data.shipping_methods[0].shipping_option_id)
 
             const orderObj = {
                 external_id: data.id,
@@ -778,9 +779,14 @@ class PrintfulService extends TransactionBaseService {
     }
 
     async confirmDraftForFulfillment(orderId: string | number) {
-        const confirmedOrder = await this.printfulClient.post(`orders/${orderId}/confirm`, {store_id: this.storeId});
-        console.log(confirmedOrder)
-        return confirmedOrder;
+        const { code, result} = await this.printfulClient.post(`orders/@${orderId}/confirm`, {store_id: this.storeId});
+        if(code === 200) {
+            return result
+        }
+        else {
+            console.log(`${red("[medusa-plugin-printful]:")} There was an error when trying to confirm the order on Printful! `, result)
+            return result;
+        }
     }
 
     async getOrderData(orderId: string | number) {
@@ -789,14 +795,6 @@ class PrintfulService extends TransactionBaseService {
     }
 
     async createMedusaFulfillment(order: CreateFulfillmentOrder, itemsToFulfill: FulFillmentItemType[]) {
-
-
-        console.log("LENGTH", itemsToFulfill.length)
-
-        const fulfillmentItems = await this.fulfillmentService.getFulfillmentItems_(order, itemsToFulfill);
-        console.log("FULFILLMENT ITEMS", fulfillmentItems)
-
-
         return await this.fulfillmentService.createFulfillment(order, itemsToFulfill);
     }
 
