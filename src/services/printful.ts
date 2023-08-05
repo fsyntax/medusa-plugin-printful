@@ -668,7 +668,7 @@ class PrintfulService extends TransactionBaseService {
     }
 
     async getShippingRates(data) {
-        console.log("Trying to get shipping rates for: ", data)
+        console.log(`${blue("[medusa-plugin-printful]:")} Getting shipping rates for: `, data)
         const {recipient, items} = data;
         try {
             const shippingRates = await this.printfulClient.post("shipping/rates", {
@@ -680,7 +680,7 @@ class PrintfulService extends TransactionBaseService {
             return shippingRates;
         } catch (e) {
             console.log(e)
-            return 0
+            return null
         }
     }
 

@@ -1,13 +1,13 @@
-import { Router } from 'express'
-import { getConfigFile } from 'medusa-core-utils'
+import express, { Router } from 'express'
+import { getConfigFile, parseCorsOrigins } from 'medusa-core-utils'
 import { ConfigModule } from '@medusajs/medusa/dist/types/global'
 import cors from 'cors'
 import authenticate from '@medusajs/medusa/dist/api/middlewares/authenticate'
 
 const bodyParser = require('body-parser')
 
-export default (rootDirectory) => {
-  const { configModule } = getConfigFile < ConfigModule > (rootDirectory, 'medusa-config')
+export default (rootDirectory: string) => {
+  const { configModule } = getConfigFile<ConfigModule>(rootDirectory, 'medusa-config')
   const { projectConfig } = configModule
   const router = Router()
 
@@ -19,6 +19,9 @@ export default (rootDirectory) => {
     origin: projectConfig.admin_cors.split(','),
     credentials: true,
   }
+
+  router.use(express.json())
+  router.use(express.urlencoded({ extended: true }))
 
   router.options('/admin/printful/create_webhooks', cors(adminCorsOptions))
   router.get('/admin/printful/create_webhooks', cors(adminCorsOptions), authenticate(), async (req, res) => {
@@ -37,7 +40,7 @@ export default (rootDirectory) => {
     })
   })
 
-  router.options('/store/printful/shipping-rates', cors(storeCorsOptions))
+
   router.post('/store/printful/shipping-rates', cors(storeCorsOptions), async (req, res) => {
     const printfulService = req.scope.resolve('printfulService')
     res.json({
