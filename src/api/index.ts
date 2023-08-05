@@ -31,6 +31,20 @@ export default (rootDirectory: string) => {
     })
   })
 
+  router.options('/admin/printful/send_order', cors(adminCorsOptions))
+  router.get('/admin/printful/send_order', cors(adminCorsOptions), authenticate(), async (req, res) => {
+    const printfulService = req.scope.resolve('printfulService')
+    const orderService = req.scope.resolve('orderService')
+    const { order_id } = req.query
+    const  order  = await orderService.retrieve(order_id, { relations: ["items","items.variant", "shipping_methods", "shipping_address"] })
+    if (order) {
+      await printfulService.createPrintfulOrder(order)
+    }
+    res.json({
+      message: "Order sent to printful - check your server logs & printful dashboard",
+    })
+  })
+
   router.options('/admin/printful/sync', cors(adminCorsOptions))
   router.get('/admin/printful/sync', cors(adminCorsOptions), async (req, res) => {
     const printfulService = req.scope.resolve('printfulSyncService')
