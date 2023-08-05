@@ -54,7 +54,7 @@ export default (rootDirectory: string) => {
     })
   })
 
-
+  router.options('/store/printful/shipping-rates', cors(storeCorsOptions))
   router.post('/store/printful/shipping-rates', cors(storeCorsOptions), async (req, res) => {
     const printfulService = req.scope.resolve('printfulService')
     res.json({
