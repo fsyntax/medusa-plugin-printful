@@ -252,6 +252,7 @@ class PrintfulService extends TransactionBaseService {
                                 currency_code: currency.toLowerCase()
                             }],
                             metadata: {
+                                brand: product.name,
                                 printful_id: id,
                                 printful_catalog_variant_id: variant_id,
                                 printful_product_id: product.product_id,
@@ -548,18 +549,18 @@ class PrintfulService extends TransactionBaseService {
     }
 
     async buildProductCategory(printfulCatalogProduct: any) {
-        const categories = printfulCatalogProduct.map(({parentProduct}) => {
-            return {
-                main_category_id: parentProduct.main_category_id,
-            }
-        })
 
         try {
             const result = await backOff(async () => {
-                const {
-                    code,
-                    result
-                } = await this.printfulClient.get(`categories/${categories[0].main_category_id}`)
+
+                const categories = printfulCatalogProduct.map(({parentProduct}) => {
+                    return {
+                        main_category_id: parentProduct.main_category_id,
+                    }
+                })
+
+                const { code, result } = await this.printfulClient.get(`categories/${categories[0].main_category_id}`)
+
                 return {code, result};
             }, this.backoffOptions);
 
@@ -597,9 +598,12 @@ class PrintfulService extends TransactionBaseService {
                     return [{id: medusaCategory[0][0].id}]
                 }
                 return []
+            } else {
+                console.error(`${red('[medusa-plugin-printful]:')} Failed getting category from Printful, skipping this operation! `, result);
+                return []
             }
         } catch (e) {
-            console.error(`${red('[medusa-plugin-printful]:')} Failed getting category from Printful, skipping this operation! `, e.result);
+            console.error(`${red('[medusa-plugin-printful]:')} Failed getting category from Printful, skipping this operation! `, e);
             return []
         }
     }
