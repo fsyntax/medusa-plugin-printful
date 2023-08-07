@@ -1,19 +1,17 @@
 import {Queue, Worker, Job} from 'bullmq';
 import {TransactionBaseService, EventBusService, ProductService, Logger} from "@medusajs/medusa";
 import {blue, blueBright, yellow} from "colorette";
-import {ConnectionOptions} from "bullmq";
 
 const redisUrlParse = require('redis-url-parse');
 
 class ProductsQueueService extends TransactionBaseService {
     private eventBusService_: EventBusService;
     private printfulService_: any;
-    private queue_: Queue;
+    private readonly queue_: Queue;
     private productWorker_: Worker;
     private productService: ProductService;
     private logger_: Logger;
-    private redisURL_: string;
-
+    private readonly redisURL_: string;
     constructor(container, options) {
         super(container);
         this.printfulService_ = container.printfulService;
@@ -27,7 +25,6 @@ class ProductsQueueService extends TransactionBaseService {
             connection: redisConfig,
 
         });
-        console.log(this.queue_)
         this.queue_.obliterate().then(() => {
             console.log(`${blueBright("[medusa-plugin-printful]:")} Queue obliterated!`)
         })
@@ -86,25 +83,6 @@ class ProductsQueueService extends TransactionBaseService {
         console.log(`[medusa-plugin-printful]: Successfully added ${jobsData.length} jobs to the queue.`);
     }
 
-    parseRedisURL(redisURL) {
-        const url = new URL(redisURL);
-
-        const redisConfig = {
-            host: url.hostname,
-            port: parseInt(url.port),
-            db: parseInt(url.pathname.substr(1)),
-        };
-
-        if (url.username || url.password) {
-            redisConfig.password = url.password;
-        }
-
-        if (isNaN(redisConfig.db)) {
-            redisConfig.db = 0; // Set the default database to 0
-        }
-
-        return redisConfig;
-    }
 
 
 }

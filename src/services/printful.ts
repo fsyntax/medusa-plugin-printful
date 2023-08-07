@@ -1,7 +1,7 @@
 import {
-    OrderService,
+    OrderService, Product,
     ProductCategoryService,
-    ProductService, ProductVariantService, SalesChannelService,
+    ProductService, ProductVariant, ProductVariantService, SalesChannelService,
     ShippingProfileService,
     TransactionBaseService
 } from "@medusajs/medusa"
@@ -12,13 +12,19 @@ import {
     CreateShipmentConfig,
     FulFillmentItemType
 } from "@medusajs/medusa/dist/types/fulfillment";
-import {CreateProductInput, UpdateProductInput} from "@medusajs/medusa/dist/types/product";
+import {
+    CreateProductInput,
+    UpdateProductInput
+} from "@medusajs/medusa/dist/types/product";
 import {kebabCase, capitalize, chunk, last} from "lodash";
 import {backOff, IBackOffOptions} from "exponential-backoff";
 
 import {blue, green, greenBright, red, yellow, yellowBright} from "colorette";
-import {FulfillmentService } from "medusa-interfaces";
 
+interface CategoryAliases {
+    exactMatch: { [key: string]: string };
+    inexactMatch: { [key: string]: string };
+}
 
 class PrintfulService extends TransactionBaseService {
 
@@ -37,7 +43,7 @@ class PrintfulService extends TransactionBaseService {
     private readonly backoffOptions: IBackOffOptions;
     private printfulClient: PrintfulClient;
     private apiKey: string;
-    private categoryAliases: object;
+    private categoryAliases: CategoryAliases;
     private readonly storeId: string;
     private readonly printfulAccessToken: string;
     private readonly productTags: boolean;
@@ -155,7 +161,7 @@ class PrintfulService extends TransactionBaseService {
                                     variant,
                                     product
                                 }
-                            } = await this.printfulClient.get(`products/variant/${variantChunk.variant_id}`);
+                            } = await this.printfulClient.get(`products/variant/${(variantChunk as { variant_id: string }).variant_id}`);
                             return {...variant, parentProduct: product};
                         }, this.backoffOptions);
                         chunkResults.push(result);
@@ -230,8 +236,11 @@ class PrintfulService extends TransactionBaseService {
             const productVariantsObj = [];
 
             for (const chunk of variantChunks) {
+
                 const chunkResults = [];
-                for (const {currency, id, product, retail_price, sku, variant_id} of chunk) {
+
+                for (const {currency, id, product, retail_price, sku, variant_id} of chunk as { currency: string, id: string, product: any, retail_price: string, sku: string, variant_id: string }[]) {
+
                     const getVariantOptions = async () => {
                         const {result: {variant: option}} = await this.printfulClient.get(`products/variant/${variant_id}`);
                         const options = {
@@ -292,7 +301,7 @@ class PrintfulService extends TransactionBaseService {
                             if (option.title === 'size' || option.title === 'color') {
                                 const value = variant.metadata[option.title];
                                 if (value !== null) {
-                                    const addedOption = await this.productVariantService.addOptionValue(variant.id, option.id, value);
+                                    const addedOption = await this.productVariantService.addOptionValue(variant.id, option.id, value as string);
                                     if (addedOption) {
                                         console.log(`${green('[medusa-plugin-printful]:')} Updated variant ${variant.id} option ${option.id} to ${value}! ✅`);
                                     }
@@ -430,13 +439,12 @@ class PrintfulService extends TransactionBaseService {
                             })
                         }
 
-                        const newVariant = await this.productVariantService.create(medusaProduct.id, {
+                        const newVariant: ProductVariant = await this.productVariantService.create(medusaProduct.id, {
                             title: `${productObj.title} - ${option.size} / ${option.color}`,
                             sku: variant.sku,
                             inventory_quantity: 100,
                             allow_backorder: true,
                             manage_inventory: false,
-                            external_id: variant.id,
                             options,
                             prices: [{
                                 amount: this.convertToInteger(variant.retail_price),
@@ -483,15 +491,14 @@ class PrintfulService extends TransactionBaseService {
 
 
                 try {
-                    const updatedProduct = await this.productService.update(medusaProduct.id, productObj);
+                    const updatedProduct: Product = await this.productService.update(medusaProduct.id, productObj);
                     console.log(`${green("[medusa-plugin-printful]: ")} Updated '${green(updatedProduct.title)}' in Medusa! `);
 
-                    const updatedVariants = await Promise.all(productVariantsObj.map(async (variant) => {
-                        const variantToUpdate = await this.productVariantService.update(variant.metadata.medusa_id, {
+                    const updatedVariants: Awaited<ProductVariant>[] = await Promise.all(productVariantsObj.map(async (variant) => {
+                        const variantToUpdate: ProductVariant = await this.productVariantService.update(variant.metadata.medusa_id, {
                             title: variant.title,
                             sku: variant.sku,
                             metadata: variant.metadata,
-                            external_id: variant.external_id,
                         });
                         if (variantToUpdate) {
                             return variantToUpdate;
@@ -552,7 +559,6 @@ class PrintfulService extends TransactionBaseService {
 
         try {
             const result = await backOff(async () => {
-
                 const categories = printfulCatalogProduct.map(({parentProduct}) => {
                     return {
                         main_category_id: parentProduct.main_category_id,
@@ -561,7 +567,8 @@ class PrintfulService extends TransactionBaseService {
 
                 const { code, result } = await this.printfulClient.get(`categories/${categories[0].main_category_id}`)
 
-                return {code, result};
+                return { code, result };
+
             }, this.backoffOptions);
 
             if (result.code === 200) {
@@ -695,28 +702,8 @@ class PrintfulService extends TransactionBaseService {
         if (countries) return countries;
     }
 
-    async getTaxCountriesList() {
-        const {result: taxCountries} = await this.printfulClient.get("tax/countries", {store_id: this.storeId});
-        if (taxCountries) return taxCountries;
-    }
-
-    async calculateTaxRate(recipient: any) {
-        const {result: taxRate} = await this.printfulClient.post("tax/rates", {recipient}, {store_id: this.storeId});
-        if (taxRate) return taxRate;
-    }
-
-    async estimateOrderCosts(recipient: any, items: any) {
-        const {result: orderCosts} = await this.printfulClient.post("orders/estimate-costs", {
-            recipient,
-            items
-        }, {store_id: this.storeId});
-
-        return orderCosts;
-    }
-
     async createPrintfulOrder(data: any) {
         console.log(`${blue('[medusa-plugin-printful]:')} Creating order with order_id '${blue(data.id)}' in Printful: `, data)
-
 
         try {
             // TODO: Check if this is really necessary
@@ -736,7 +723,7 @@ class PrintfulService extends TransactionBaseService {
                     email: data.email,
                     phone: data.shipping_address.phone ?? '',
                 },
-                items: data.items.map((item) => {
+                items: data.items.map((item: { variant: { title: any; metadata: { printful_catalog_variant_id: any; printful_id: any; }; }; variant_id: any; quantity: number; unit_price: number; }) => {
                     return {
                         name: item.variant.title,
                         external_id: item.variant_id,

@@ -7,3 +7,4 @@ node_modules/
 docker-compose.yml
 medusa-config.js
 README.md
+index.js

@@ -1,12 +1,9 @@
 import {TransactionBaseService} from "@medusajs/medusa"
-import {EntityManager} from "typeorm"
 import {PrintfulClient} from "../utils/printful-request"
 import {greenBright} from "colorette";
 
 
 class PrintfulWebhooksService extends TransactionBaseService {
-    protected manager_: EntityManager
-    protected transactionManager_: EntityManager
     private readonly storeId: any;
     private readonly backendUrl: any;
     private printfulClient: any;
