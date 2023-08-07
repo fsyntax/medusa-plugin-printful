@@ -4,6 +4,7 @@ tsconfig.json
 tsconfig.spec.json
 .eslintignore
 .gitignore
+src/
 
 .idea/
 .github/
