@@ -5,6 +5,7 @@ tsconfig.spec.json
 .eslintignore
 .gitignore
 
+.idea/
 .github/
 .env
 *.log
