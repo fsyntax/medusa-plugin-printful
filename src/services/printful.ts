@@ -243,10 +243,25 @@ class PrintfulService extends TransactionBaseService {
 
                     const getVariantOptions = async () => {
                         const {result: {variant: option}} = await this.printfulClient.get(`products/variant/${variant_id}`);
+
                         const options = {
                             ...(option.size ? {size: option.size} : {}),
                             ...(option.color ? {color: option.color} : {}),
                             ...(option.color_code ? {color_code: option.color_code} : {})
+                        }
+
+                        const metadata = {
+                            brand: product.name,
+                            printful_id: id,
+                            printful_catalog_variant_id: variant_id,
+                            printful_product_id: product.product_id,
+                            printful_catalog_product_id: product.id,
+                            size_tables: productSizeGuide?.size_tables ?? null,
+                            ...options
+                        }
+                        if(option.color) {
+                            metadata.color = option.color;
+                            metadata.color_code = option.color_code;
                         }
 
                         return {
@@ -260,15 +275,7 @@ class PrintfulService extends TransactionBaseService {
                                 amount: this.convertToInteger(retail_price),
                                 currency_code: currency.toLowerCase()
                             }],
-                            metadata: {
-                                brand: product.name,
-                                printful_id: id,
-                                printful_catalog_variant_id: variant_id,
-                                printful_product_id: product.product_id,
-                                printful_catalog_product_id: product.id,
-                                size_tables: productSizeGuide?.size_tables ?? null,
-                                ...options
-                            }
+                            metadata
                         }
                     }
                     const variantOptions = await backOff(getVariantOptions, this.backoffOptions);
@@ -405,10 +412,13 @@ class PrintfulService extends TransactionBaseService {
                             printful_id: variant.id,
                             printful_catalog_variant_id: variant.variant_id,
                             size: option.size,
-                            color: option.color,
-                            color_code: option.color_code,
                             ...productSizeGuide
                         };
+
+                        if(option.color) {
+                            metadata.color = option.color
+                            metadata.color_code = option.color_code
+                        }
 
                         return {
                             title,
@@ -450,14 +460,6 @@ class PrintfulService extends TransactionBaseService {
                                 amount: this.convertToInteger(variant.retail_price),
                                 currency_code: variant.currency.toLowerCase()
                             }],
-                            metadata: {
-                                printful_id: variant.id,
-                                printful_catalog_variant_id: variant.variant_id,
-                                size: option.size,
-                                color: option.color,
-                                color_code: option.color_code,
-                                ...productSizeGuide
-                            }
                         });
 
                         if (newVariant) {
@@ -470,11 +472,12 @@ class PrintfulService extends TransactionBaseService {
                                 printful_id: variant.id,
                                 printful_catalog_variant_id: variant.variant_id,
                                 size: option.size,
-                                color: option.color,
-                                color_code: option.color_code,
                                 ...productSizeGuide
                             };
-
+                            if(option.color) {
+                                metadata.color = option.color
+                                metadata.color_code = option.color_code
+                            }
                             return {
                                 title,
                                 sku: variant.sku,
