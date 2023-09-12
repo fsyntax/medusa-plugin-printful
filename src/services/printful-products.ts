@@ -1,0 +1,65 @@
+import { Logger, ProductService, TransactionBaseService } from "@medusajs/medusa"
+import { PrintfulClient } from "../utils/printful-request"
+
+class PrintfulProductService extends TransactionBaseService {
+
+    private printfulClient: PrintfulClient;
+    private readonly printfulStoreId: string;
+    private logger: Logger;
+    private productService: ProductService;
+
+    constructor(container, options) {
+        super(container);
+
+        this.printfulClient = new PrintfulClient(options.printfulAccessToken);
+        this.printfulStoreId = options.printfulStoreId;
+        this.logger = container.logger;
+        this.productService = container.productService;
+    }
+
+    async getSyncProducts(category_id?: string){
+        const { code , result, error } = await this.printfulClient.get(`/store/products${category_id ? '?' + category_id : ''}`, { store_id: this.printfulStoreId });
+
+        if(error){
+            this.logger.error(`[medusa-plugin-printful]: Error fetching sync products from Printful store: ${error.message}`);
+            return new Error(error.message)
+        }
+        return result;
+    }
+
+    async getSingleSyncProduct(product_id: string) {
+        const { code , result, error } = await this.printfulClient.get(`/store/products/${product_id}`, { store_id: this.printfulStoreId })
+
+        if(error) {
+            this.logger.error(`[medusa-plugin-printful]: Error fetching single sync product from Printful store: ${error.message}`);
+            return new Error(error.message)
+        }
+        return result;
+    }
+
+    async getSyncVariant(variant_id: string) {
+        const { code , result, error } = await this.printfulClient.get(`/store/variants/${variant_id}`, {store_id: this.printfulStoreId});
+
+        if(error){
+            this.logger.error(`[medusa-plugin-printful]: Error fetching sync variant from Printful store: ${error.message}`);
+            return new Error(error.message)
+        }
+        return result;
+    }
+
+
+    async createSyncVariant(product_id: string, variant_id: string, retail_price: string, is_ignored: boolean, sku: string, files: any[], options: any[]) {
+        const { code , result, error } = await this.printfulClient.post(
+            `/store/products/${product_id}/variants`,
+            { store_id: this.printfulStoreId, variant_id, retail_price, is_ignored, sku, files, options },
+        );
+
+        if(error){
+            this.logger.error(`[medusa-plugin-printful]: Error creating sync variant in Printful store: ${error.message}`);
+            return new Error(error.message)
+        }
+        return result;
+    }
+}
+
+export default PrintfulProductService
