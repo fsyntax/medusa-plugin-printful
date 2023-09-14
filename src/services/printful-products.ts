@@ -37,6 +37,35 @@ class PrintfulProductService extends TransactionBaseService {
         return result;
     }
 
+    async deleteSyncProduct(product_id: string) {
+        try {
+            const { code } = await this.printfulClient.delete(`/store/products/${product_id}`, { store_id: this.printfulStoreId });
+
+            if(code === 200) {
+                this.logger.info(`[medusa-plugin-printful]: Deleted sync variant ${product_id} from Printful store.`);
+                return true;
+            }
+            else {
+                this.logger.error(`[medusa-plugin-printful]: Error deleting sync product from Printful store: Code: ${code}`);
+                return new Error(code)
+            }
+        } catch (error) {
+            this.logger.error(`[medusa-plugin-printful]: Error deleting sync product from Printful store: ${error.message}`);
+            return new Error(error.message)
+        }
+    }
+
+    async modifySyncProduct(product_id: string, payload: any) {
+        const { code , result, error } = await this.printfulClient.put(`/store/products/${product_id}`, { store_id: this.printfulStoreId, ...payload });
+
+        if(error){
+            this.logger.error(`[medusa-plugin-printful]: Error modifying sync product in Printful store: Code: ${code} / ${result}`);
+            return new Error(result)
+        }
+
+        return result;
+    }
+
     async getSyncVariant(variant_id: string) {
         const { code , result, error } = await this.printfulClient.get(`/store/variants/${variant_id}`, {store_id: this.printfulStoreId});
 
@@ -58,6 +87,35 @@ class PrintfulProductService extends TransactionBaseService {
             this.logger.error(`[medusa-plugin-printful]: Error creating sync variant in Printful store: ${error.message}`);
             return new Error(error.message)
         }
+        return result;
+    }
+
+    async deleteSyncVariant(variant_id: string) {
+        try {
+            const { code } = await this.printfulClient.delete(`/store/variants/${variant_id}`, { store_id: this.printfulStoreId });
+
+            if(code === 200) {
+                this.logger.info(`[medusa-plugin-printful]: Deleted sync variant ${variant_id} from Printful store.`);
+                return true;
+            }
+            else {
+                this.logger.error(`[medusa-plugin-printful]: Error deleting sync product from Printful store: Code: ${code}`);
+                return new Error(code)
+            }
+        } catch (error) {
+            this.logger.error(`[medusa-plugin-printful]: Error deleting sync variant from Printful store: ${error.message}`);
+            return new Error(error.message)
+        }
+    }
+
+    async modifySyncVariant(variant_id: string, payload: any) {
+        const { code , result, error } = await this.printfulClient.put(`/store/variants/${variant_id}`, { store_id: this.printfulStoreId, ...payload });
+
+        if(error){
+            this.logger.error(`[medusa-plugin-printful]: Error modifying sync variant in Printful store: Code: ${code} / ${result}`);
+            return new Error(result)
+        }
+
         return result;
     }
 }
