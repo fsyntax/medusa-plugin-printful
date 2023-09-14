@@ -35,7 +35,7 @@
     "@babel/cli": "^7.18.10",
     "@babel/core": "^7.21.8",
     "@babel/preset-typescript": "^7.14.5",
-    "@medusajs/medusa": "^1.12.0",
+    "@medusajs/medusa": "^1.15.1",
     "@types/node": "^20.4.8",
     "babel-eslint": "^10.1.0",
     "babel-preset-medusa-package": "^1.1.19",
@@ -46,7 +46,7 @@
     "typescript": "^5.0.4"
   },
   "peerDependencies": {
-    "@medusajs/medusa": "^1.12.0"
+    "@medusajs/medusa": "^1.15.1"
   },
   "simple-git-hooks": {
     "pre-commit": "yarn lint-staged"

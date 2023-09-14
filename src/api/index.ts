@@ -3,6 +3,7 @@ import { getConfigFile, parseCorsOrigins } from 'medusa-core-utils'
 import { ConfigModule } from '@medusajs/medusa/dist/types/global'
 import cors from 'cors'
 import authenticate from '@medusajs/medusa/dist/api/middlewares/authenticate'
+import {sync} from "rimraf";
 
 const bodyParser = require('body-parser')
 
@@ -22,6 +23,7 @@ export default (rootDirectory: string) => {
 
   router.use(express.json())
   router.use(express.urlencoded({ extended: true }))
+
 
   router.options('/admin/printful/create_webhooks', cors(adminCorsOptions))
   router.get('/admin/printful/create_webhooks', cors(adminCorsOptions), authenticate(), async (req, res) => {
@@ -43,6 +45,15 @@ export default (rootDirectory: string) => {
     res.json({
       message: "Order sent to printful - check your server logs & printful dashboard",
     })
+  })
+
+  router.options('/admin/printful/sync_products', cors(adminCorsOptions))
+  router.get('/admin/printful/sync_products', cors(adminCorsOptions), authenticate(), async (req, res) => {
+    const printfulService = req.scope.resolve('printfulPlatformSyncService')
+
+    const sync_products = await printfulService.getSyncProducts()
+
+    res.json(sync_products)
   })
 
   router.options('/admin/printful/sync', cors(adminCorsOptions))
