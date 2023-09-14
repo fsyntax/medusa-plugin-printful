@@ -8,8 +8,8 @@ interface ModifyVariantOptions {
     retail_price?: string;
     is_ignored?: boolean;
     sku?: string;
-    files?: any[];  // Define a more specific type based on your needs
-    options?: any[];  // Define a more specific type based on your needs
+    files?: any[];
+    options?: any[];
 }
 
 class PrintfulPlatformSyncService extends TransactionBaseService {
