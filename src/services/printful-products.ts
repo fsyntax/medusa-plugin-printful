@@ -21,7 +21,7 @@ class PrintfulProductService extends TransactionBaseService {
         const { code , result, error } = await this.printfulClient.get(`/store/products${category_id ? '?' + category_id : ''}`, { store_id: this.printfulStoreId });
 
         if(error){
-            this.logger.error(`[medusa-plugin-printful]: Error fetching sync products from Printful store: ${error.message}`);
+            this.logger.error(`[medusa-plugin-printful]: Error fetching sync products from Printful store: Code: ${code} / ${result}`);
             return new Error(error.message)
         }
         return result;
@@ -31,8 +31,8 @@ class PrintfulProductService extends TransactionBaseService {
         const { code , result, error } = await this.printfulClient.get(`/store/products/${product_id}`, { store_id: this.printfulStoreId })
 
         if(error) {
-            this.logger.error(`[medusa-plugin-printful]: Error fetching single sync product from Printful store: ${error.message}`);
-            return new Error(error.message)
+            this.logger.error(`[medusa-plugin-printful]: Error fetching single sync product from Printful store: ${code} / ${result}`);
+            return new Error(result)
         }
         return result;
     }
@@ -70,7 +70,7 @@ class PrintfulProductService extends TransactionBaseService {
         const { code , result, error } = await this.printfulClient.get(`/store/variants/${variant_id}`, {store_id: this.printfulStoreId});
 
         if(error){
-            this.logger.error(`[medusa-plugin-printful]: Error fetching sync variant from Printful store: ${error.message}`);
+            this.logger.error(`[medusa-plugin-printful]: Error fetching sync variant from Printful store: ${code} / ${error.message}`);
             return new Error(error.message)
         }
         return result;
@@ -84,8 +84,8 @@ class PrintfulProductService extends TransactionBaseService {
         );
 
         if(error){
-            this.logger.error(`[medusa-plugin-printful]: Error creating sync variant in Printful store: ${error.message}`);
-            return new Error(error.message)
+            this.logger.error(`[medusa-plugin-printful]: Error creating sync variant in Printful store: ${code} / ${result}`);
+            return new Error(result)
         }
         return result;
     }
