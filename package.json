@@ -9,15 +9,18 @@
     "url": "https://github.com/fsyntax/medusa-plugin-printful.git"
   },
   "scripts": {
-    "build": "rimraf dist && tsc",
-    "prepare": "cross-env NODE_ENV=production yarn run build",
+    "clean": "cross-env ./node_modules/.bin/rimraf dist",
     "watch": "tsc --watch",
+    "build": "cross-env pnpm run clean && pnpm run build:server && pnpm run build:admin",
+    "build:server": "cross-env pnpm run clean && tsc -p tsconfig.json",
+    "build:admin": "cross-env medusa-admin build",
+    "prepare": "cross-env NODE_ENV=production pnpm run build:server && medusa-admin bundle",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
     "@babel/eslint-parser": "^7.21.8",
-    "@medusajs/admin": "^6.0.0",
+    "@medusajs/admin": "^7.0.1",
     "@types/lodash": "^4.14.191",
     "body-parser": "^1.20.2",
     "bullmq": "^3.15.6",
@@ -46,7 +49,9 @@
     "typescript": "^5.0.4"
   },
   "peerDependencies": {
-    "@medusajs/medusa": "^1.15.1"
+    "@medusajs/medusa": "^1.15.1",
+    "react": "^18.2.0",
+    "react-router-dom": "^6.13.0"
   },
   "simple-git-hooks": {
     "pre-commit": "yarn lint-staged"

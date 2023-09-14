@@ -1,25 +1,32 @@
 {
   "compilerOptions": {
-    "lib": ["es5", "es6"],
-    "target": "esnext",
-    "allowJs": true,
-    "esModuleInterop": true,
+    "target": "es2019",
     "module": "commonjs",
-    "moduleResolution": "node",
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "skipLibCheck": true,
-    "skipDefaultLibCheck": true,
-    "declaration": false,
-    "sourceMap": true,
+    "allowJs": true,
+    "checkJs": false,
+    "jsx": "react-jsx",
+    "declaration": true,
     "outDir": "./dist",
-    "rootDir": "src",
-    "baseUrl": "src"
+    "rootDir": "./src",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "noEmit": false,
+    "strict": false,
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
   },
-  "include": ["src"],
+  "include": ["src/"],
   "exclude": [
-    "**/__tests__",
-    "**/__fixtures__",
-    "node_modules"
+    "dist",
+    "build",
+    ".cache",
+    "tests",
+    "**/*.spec.js",
+    "**/*.spec.ts",
+    "node_modules",
+    ".eslintrc.js"
   ]
 }

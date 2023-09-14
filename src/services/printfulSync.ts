@@ -47,11 +47,7 @@ class PrintfulSyncService extends TransactionBaseService {
                 await this.syncPrintfulProducts()
             }, 3000)
         }
-        if (options.enableWebhooks) {
-            this.printfulWebhooksService.createWebhooks().then().catch(e => {
-                console.log(red("Error creating Printful Webhooks!"), e)
-            });
-        }
+
 
     }
 

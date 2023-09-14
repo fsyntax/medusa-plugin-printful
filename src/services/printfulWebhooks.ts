@@ -1,6 +1,6 @@
-import {TransactionBaseService} from "@medusajs/medusa"
+import {Logger, TransactionBaseService} from "@medusajs/medusa"
 import {PrintfulClient} from "../utils/printful-request"
-import {greenBright} from "colorette";
+import {greenBright, red} from "colorette";
 
 
 class PrintfulWebhooksService extends TransactionBaseService {
@@ -11,6 +11,7 @@ class PrintfulWebhooksService extends TransactionBaseService {
     private readonly enableWebhooks: any;
 
     private readonly printfulAccessToken: any;
+    private logger: Logger;
 
 
     constructor(container, options) {
@@ -22,12 +23,18 @@ class PrintfulWebhooksService extends TransactionBaseService {
         this.eventBusService = container.eventBusService;
         this.enableWebhooks = options.enableWebhooks;
         this.manager_ = container.manager;
+        this.logger = container.logger;
 
+        if (options.enableWebhooks) {
+            this.createWebhooks().then().catch(e => {
+                this.logger.error("Error creating Printful Webhooks! ", e)
+            });
+        }
 
     }
 
     async createWebhooks() {
-        console.log(`${greenBright("[medusa-plugin-printful]:")} Creating Printful Webhooks!`)
+
         const currentWebhookConfig = await this.printfulClient.get("webhooks", {store_id: this.storeId});
         console.log(`${greenBright("[medusa-plugin-printful]: ")} Your current Printful Webhook configuration: `, currentWebhookConfig)
         if (currentWebhookConfig.url !== `${this.backendUrl}/printful/webhook`) {
@@ -56,6 +63,7 @@ class PrintfulWebhooksService extends TransactionBaseService {
         } else {
             console.log(`${greenBright("[medusa-plugin-printful]:")} Printful Webhook Support is already enabled! `);
         }
+
     }
 
     async disableWebhooks() {

@@ -17,15 +17,15 @@ class PrintfulProductService extends TransactionBaseService {
         this.productService = container.productService;
     }
 
-    async getSyncProducts(category_id?: string){
-        const { code , result, error } = await this.printfulClient.get(`/store/products${category_id ? '?' + category_id : ''}`, { store_id: this.printfulStoreId });
-
-        if(error){
-            this.logger.error(`[medusa-plugin-printful]: Error fetching sync products from Printful store: Code: ${code} / ${result}`);
-            return new Error(error.message)
-        }
-        return result;
-    }
+    // async getSyncProducts(category_id?: string){
+    //     const { code , result, error } = await this.printfulClient.get(`/store/products${category_id ? '?' + category_id : ''}`, { store_id: this.printfulStoreId });
+    //
+    //     if(error){
+    //         this.logger.error(`[medusa-plugin-printful]: Error fetching sync products from Printful store: Code: ${code} / ${result}`);
+    //         return new Error(error.message)
+    //     }
+    //     return result;
+    // }
 
     async getSingleSyncProduct(product_id: string) {
         const { code , result, error } = await this.printfulClient.get(`/store/products/${product_id}`, { store_id: this.printfulStoreId })
