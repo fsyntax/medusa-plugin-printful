@@ -38,6 +38,13 @@ export default (rootDirectory, options) => {
     }
   })
 
+  adminRouter.options('/admin/printful/sync_products/:product_id', cors(adminCorsOptions))
+    adminRouter.get('/admin/printful/sync_products/:product_id', cors(adminCorsOptions), async (req, res) => {
+      const printfulPlatformSyncService = req.scope.resolve('printfulPlatformSyncService')
+      const sync_product = await printfulPlatformSyncService.getSingleSyncProduct(req.params.product_id)
+      res.json(sync_product)
+    })
+
   adminRouter.options('/admin/printful/sync_products/:product_id/modify', cors(adminCorsOptions))
   adminRouter.post('/admin/printful/sync_products/:product_id/modify', cors(adminCorsOptions), async (req, res) => {
     const printfulProductService = req.scope.resolve('printfulProductService')
@@ -47,13 +54,13 @@ export default (rootDirectory, options) => {
     return res.json(sync_product);
   })
 
-  adminRouter.options('/admin/printful/sync_products/:product_id', cors(adminCorsOptions))
-    adminRouter.get('/admin/printful/sync_products/:product_id', cors(adminCorsOptions), async (req, res) => {
-      const printfulPlatformSyncService = req.scope.resolve('printfulPlatformSyncService')
-      const sync_product = await printfulPlatformSyncService.getSingleSyncProduct(req.params.product_id)
+  adminRouter.options('/admin/printful/sync_products/:product_id/sync', cors(adminCorsOptions))
+  adminRouter.post('/admin/printful/sync_products/:product_id/sync', cors(adminCorsOptions), async (req, res) => {
+    const printfulPlatformSyncService = req.scope.resolve('printfulPlatformSyncService')
+    const product = await printfulPlatformSyncService.syncProduct(req.params.product_id)
+    return res.json(product);
+  })
 
-      res.json(sync_product)
-    })
 
   adminRouter.options('/admin/printful/sync_variant/:variant_id', cors(adminCorsOptions))
     adminRouter.get('/admin/printful/sync_variant/:variant_id', cors(adminCorsOptions), async (req, res) => {

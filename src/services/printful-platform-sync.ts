@@ -1,5 +1,6 @@
-import { Logger, TransactionBaseService } from "@medusajs/medusa"
+import {Logger, ProductService, TransactionBaseService} from "@medusajs/medusa"
 import { PrintfulClient } from "../utils/printful-request"
+import PrintfulCatalogService from "./printful-catalog";
 
 interface ModifyVariantOptions {
     id?: number;
@@ -17,20 +18,36 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
     private printfulClient: PrintfulClient;
     private readonly storeId: string;
     private logger: Logger;
+    private productService: ProductService;
+    private printfulCatalogService: PrintfulCatalogService;
 
     constructor(container, options) {
         super(container);
 
+        this.productService = container.productService;
         this.printfulClient = new PrintfulClient(options.printfulAccessToken);
         this.storeId = options.storeId;
         this.logger = container.logger;
+        this.printfulCatalogService = container.printfulCatalogService;
     }
 
     async getSyncProducts(queryParams?: { offset: number, status: "synced" | "unsynced" | "all", search: string, limit: number }) {
 
         try {
             const { result } = await this.printfulClient.get(`/sync/products`, {store_id: this.storeId, ...queryParams});
-            return result;
+
+
+                // check every product in result if external_id starts with "prod_" and if not, add a new object "synced_medusa" with value false
+                const resultWithSyncedMedusa = result.map((product) => {
+                    if(!product.external_id.startsWith("prod_")) {
+                        return {...product, synced_medusa: false}
+                    } else {
+                        return {...product, synced_medusa: true}
+                    }
+                })
+                console.log("resultWithSyncedMedusa", resultWithSyncedMedusa)
+                return resultWithSyncedMedusa;
+
         } catch (error) {
             this.logger.error(`[medusa-plugin-printful]: Error fetching sync products from Printful store: ${JSON.stringify(error)}`);
             return error;
@@ -39,8 +56,11 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
 
     async getSingleSyncProduct(product_id: string | number) {
         try {
-            const { result } = await this.printfulClient.get(`/sync/products/${product_id}`, { store_id: this.storeId })
-            return result;
+            const { result: { sync_product, sync_variant } } = await this.printfulClient.get(`/sync/products/${product_id}`, { store_id: this.storeId })
+            return {
+                sync_product,
+                sync_variant
+            };
         } catch (error) {
             this.logger.error(`[medusa-plugin-printful]: Error fetching single sync product from Printful store: ${JSON.stringify(error)}`);
             return error;
@@ -67,6 +87,7 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
 
     async getSyncVariant(variant_id: string | number) {
         try {
+            this.logger.info(`[medusa-plugin-printful]: Fetching sync variant from Printful store: ${variant_id}`);
             const { result } = await this.printfulClient.get(`/sync/variants/${variant_id}`, { store_id: this.storeId });
             return result;
         } catch (error) {
@@ -98,8 +119,16 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
         }
     }
 
-    async syncProduct(product_id: string | number) {
-        //
+    async syncProduct(printful_product_id: string | number) {
+        try {
+            const result = await this.getSingleSyncProduct(printful_product_id);
+            this.logger.info(result)
+            return result
+        } catch (e)
+        {
+            this.logger.error(`[medusa-plugin-printful]: Error syncing product in Printful store: ${JSON.stringify(e)}`);
+            return e;
+        }
     }
 
 }
