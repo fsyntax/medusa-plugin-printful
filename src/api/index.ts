@@ -48,9 +48,7 @@ export default (rootDirectory, options) => {
   adminRouter.options('/admin/printful/sync_products/:product_id/modify', cors(adminCorsOptions))
   adminRouter.post('/admin/printful/sync_products/:product_id/modify', cors(adminCorsOptions), async (req, res) => {
     const printfulProductService = req.scope.resolve('printfulProductService')
-    console.log("req.body", req.body)
     const sync_product = await printfulProductService.modifySyncProduct(req.params.product_id, req.body)
-    console.log("sync_product", sync_product)
     return res.json(sync_product);
   })
 

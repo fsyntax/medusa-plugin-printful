@@ -1,6 +1,16 @@
-import {Logger, ProductService, TransactionBaseService} from "@medusajs/medusa"
+import {
+    Logger,
+    ProductService,
+    SalesChannelService,
+    ShippingProfileService,
+    TransactionBaseService
+} from "@medusajs/medusa"
 import { PrintfulClient } from "../utils/printful-request"
 import PrintfulCatalogService from "./printful-catalog";
+import {CreateProductInput, CreateProductProductVariantInput} from "@medusajs/medusa/dist/types/product";
+import {SyncVariant} from "../types/printfulGetSyncProducts";
+import PrintfulProductService from "./printful-product";
+import {kebabCase} from "lodash";
 
 interface ModifyVariantOptions {
     id?: number;
@@ -13,6 +23,10 @@ interface ModifyVariantOptions {
     options?: any[];
 }
 
+
+
+
+
 class PrintfulPlatformSyncService extends TransactionBaseService {
 
     private printfulClient: PrintfulClient;
@@ -20,6 +34,9 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
     private logger: Logger;
     private productService: ProductService;
     private printfulCatalogService: PrintfulCatalogService;
+    private printfulProductService: PrintfulProductService;
+    private salesChannelService: SalesChannelService;
+    private shippingProfileService: ShippingProfileService;
 
     constructor(container, options) {
         super(container);
@@ -29,6 +46,10 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
         this.storeId = options.storeId;
         this.logger = container.logger;
         this.printfulCatalogService = container.printfulCatalogService;
+        this.printfulProductService = container.printfulProductService;
+        this.salesChannelService = container.salesChannelService;
+        this.shippingProfileService = container.shippingProfileService;
+
     }
 
     async getSyncProducts(queryParams?: { offset: number, status: "synced" | "unsynced" | "all", search: string, limit: number }) {
@@ -45,7 +66,6 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
                         return {...product, synced_medusa: true}
                     }
                 })
-                console.log("resultWithSyncedMedusa", resultWithSyncedMedusa)
                 return resultWithSyncedMedusa;
 
         } catch (error) {
@@ -121,9 +141,53 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
 
     async syncProduct(printful_product_id: string | number) {
         try {
-            const result = await this.getSingleSyncProduct(printful_product_id);
-            this.logger.info(result)
-            return result
+            const { result: { sync_product, sync_variant } } = await this.printfulClient.get(`/sync/products/${printful_product_id}`, { store_id: this.storeId })
+
+            this.logger.info(`[medusa-plugin-printful]: Syncing product ${printful_product_id}.`, );
+
+            const defaultShippingProfile = await this.shippingProfileService.retrieveDefault();
+            const defaultSalesChannel = await this.salesChannelService.retrieveDefault();
+
+            const medusaVariants: CreateProductProductVariantInput[] = sync_variant.map((variant: SyncVariant) => {
+                return {
+                    title: variant.name,
+                    sku: variant.sku,
+                    external_id: variant.id,
+                    inventory_quantity: 300,
+                    metadata: {
+                        printful_variant_id: variant.id,
+                    }
+                }
+            })
+
+            const medusaProduct: CreateProductInput = {
+                title: sync_product.name,
+                handle: kebabCase(sync_product.name),
+                thumbnail: sync_product.thumbnail_url,
+                // options: buildProductOptions(),
+                // images: this.buildProductImages(printfulSyncVariants),
+                // tags: this.productTags ? productTags : [],
+                // categories: productCategories,
+                profile_id: defaultShippingProfile.id,
+                external_id: sync_product.id,
+                sales_channels: [{id: defaultSalesChannel.id}],
+                metadata: {
+                    printful_id: sync_product.id
+                }
+            }
+
+            this.logger.info(`[medusa-plugin-printful]: Medusa product: ${JSON.stringify(medusaProduct)}`);
+
+            const product =  await this.productService.create(medusaProduct)
+
+            if(product) {
+                const updatedExternalId = await this.printfulProductService.modifySyncProduct(
+                    sync_product.id,
+                    { name: sync_product.name, external_id: product.id }
+                )
+                return updatedExternalId;
+            }
+
         } catch (e)
         {
             this.logger.error(`[medusa-plugin-printful]: Error syncing product in Printful store: ${JSON.stringify(e)}`);
