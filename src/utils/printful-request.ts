@@ -72,6 +72,13 @@ export class PrintfulClient {
             throw json;
         }
 
+        if (json && json['result'] && Array.isArray(json['result']) && json['code']) {
+            return {
+                code: json['code'],
+                result: json['result']
+            };
+        }
+
         return json;
     }
 

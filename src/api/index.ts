@@ -36,15 +36,23 @@ export default (rootDirectory, options) => {
       const sync_products = await printfulPlatformSyncService.getSyncProducts(req.query as any)
       res.json(sync_products)
     }
+  })
 
+  adminRouter.options('/admin/printful/sync_products/:product_id/modify', cors(adminCorsOptions))
+  adminRouter.post('/admin/printful/sync_products/:product_id/modify', cors(adminCorsOptions), async (req, res) => {
+    const printfulProductService = req.scope.resolve('printfulProductService')
+    console.log("req.body", req.body)
+    const sync_product = await printfulProductService.modifySyncProduct(req.params.product_id, req.body)
+    console.log("sync_product", sync_product)
+    return res.json(sync_product);
   })
 
   adminRouter.options('/admin/printful/sync_products/:product_id', cors(adminCorsOptions))
     adminRouter.get('/admin/printful/sync_products/:product_id', cors(adminCorsOptions), async (req, res) => {
       const printfulPlatformSyncService = req.scope.resolve('printfulPlatformSyncService')
-      const sync_prodct = await printfulPlatformSyncService.getSingleSyncProduct(req.params.product_id)
+      const sync_product = await printfulPlatformSyncService.getSingleSyncProduct(req.params.product_id)
 
-      res.json(sync_prodct)
+      res.json(sync_product)
     })
 
   adminRouter.options('/admin/printful/sync_variant/:variant_id', cors(adminCorsOptions))

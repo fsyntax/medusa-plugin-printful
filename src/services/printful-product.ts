@@ -1,6 +1,13 @@
 import { Logger, ProductService, TransactionBaseService } from "@medusajs/medusa"
 import { PrintfulClient } from "../utils/printful-request"
 
+interface SyncProductModifyPayload {
+    name: string;
+    thumbnail?: string;
+    external_id?: string | number;
+    is_ignored?: boolean;
+}
+
 class PrintfulProductService extends TransactionBaseService {
 
     private printfulClient: PrintfulClient;
@@ -12,20 +19,20 @@ class PrintfulProductService extends TransactionBaseService {
         super(container);
 
         this.printfulClient = new PrintfulClient(options.printfulAccessToken);
-        this.printfulStoreId = options.printfulStoreId;
+        this.printfulStoreId = options.storeId;
         this.logger = container.logger;
         this.productService = container.productService;
     }
 
-    // async getSyncProducts(category_id?: string){
-    //     const { code , result, error } = await this.printfulClient.get(`/store/products${category_id ? '?' + category_id : ''}`, { store_id: this.printfulStoreId });
-    //
-    //     if(error){
-    //         this.logger.error(`[medusa-plugin-printful]: Error fetching sync products from Printful store: Code: ${code} / ${result}`);
-    //         return new Error(error.message)
-    //     }
-    //     return result;
-    // }
+    async getSyncProducts(category_id?: string){
+        const { code , result, error } = await this.printfulClient.get(`/store/products${category_id ? '?' + category_id : ''}`, { store_id: this.printfulStoreId });
+
+        if(error){
+            this.logger.error(`[medusa-plugin-printful]: Error fetching sync products from Printful store: Code: ${code} / ${result}`);
+            return new Error(error.message)
+        }
+        return result;
+    }
 
     async getSingleSyncProduct(product_id: string) {
         const { code , result, error } = await this.printfulClient.get(`/store/products/${product_id}`, { store_id: this.printfulStoreId })
@@ -55,8 +62,17 @@ class PrintfulProductService extends TransactionBaseService {
         }
     }
 
-    async modifySyncProduct(product_id: string, payload: any) {
-        const { code , result, error } = await this.printfulClient.put(`/store/products/${product_id}`, { store_id: this.printfulStoreId, ...payload });
+
+
+    async modifySyncProduct(product_id: string, payload: SyncProductModifyPayload) {
+
+        console.log("payload", payload)
+        const { code , result, error } = await this.printfulClient.put(
+            `/store/products/${product_id}`,
+            {
+                store_id: this.printfulStoreId,
+                sync_product: {...payload},
+            });
 
         if(error){
             this.logger.error(`[medusa-plugin-printful]: Error modifying sync product in Printful store: Code: ${code} / ${result}`);

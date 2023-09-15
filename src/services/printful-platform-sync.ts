@@ -24,7 +24,6 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
         this.printfulClient = new PrintfulClient(options.printfulAccessToken);
         this.storeId = options.storeId;
         this.logger = container.logger;
-        this.printfulClient = new PrintfulClient(options.printfulAccessToken);
     }
 
     async getSyncProducts(queryParams?: { offset: number, status: "synced" | "unsynced" | "all", search: string, limit: number }) {
@@ -97,6 +96,10 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
             this.logger.error(`[medusa-plugin-printful]: Error deleting sync variant in Printful store: ${JSON.stringify(e)}`);
             return e;
         }
+    }
+
+    async syncProduct(product_id: string | number) {
+        //
     }
 
 }
