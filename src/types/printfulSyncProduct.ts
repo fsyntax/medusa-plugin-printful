@@ -33,9 +33,9 @@ export interface Options {
     // Empty object, add fields as needed
 }
 
-export interface SyncVariant {
-    id: number;
-    external_id: string;
+export interface PrintfulSyncProductVariant {
+    id: number | string;
+    external_id: string | number;
     sync_product_id: number;
     name: string;
     synced: boolean;
@@ -51,22 +51,25 @@ export interface SyncVariant {
     warehouse_product_variant_id: number;
 }
 
-export interface SyncProduct {
-    id: number;
+export interface PrintfulSyncProductProduct {
+    id: number | string;
     external_id: string;
     name: string;
     variants: number;
     synced: number;
-    thumbnail_url: string;
+    thumbnail_url: string
     is_ignored: boolean;
 }
 
-export interface Result {
-    sync_product: SyncProduct;
-    sync_variants: SyncVariant[];
-}
 
-export interface ApiResponse {
+export interface GetSyncProductRes {
     code: number;
-    result: Result;
+    result: {
+        sync_product: PrintfulSyncProductProduct;
+        sync_variants: PrintfulSyncProductVariant[];
+    };
+    error?: {
+        message?: string;
+        reason?: string;
+    }
 }

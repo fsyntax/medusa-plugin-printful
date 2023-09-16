@@ -5,12 +5,14 @@ import {
     ShippingProfileService,
     TransactionBaseService
 } from "@medusajs/medusa"
-import { PrintfulClient } from "../utils/printful-request"
+import {PrintfulClient} from "../utils/printful-request"
+import {buildProductImages, buildProductOptions, buildProductTags, convertToInteger} from "../utils/printful-utils";
 import PrintfulCatalogService from "./printful-catalog";
 import {CreateProductInput, CreateProductProductVariantInput} from "@medusajs/medusa/dist/types/product";
-import {SyncVariant} from "../types/printfulGetSyncProducts";
+import {GetSyncProductRes, PrintfulSyncProductProduct, PrintfulSyncProductVariant} from "../types/printfulSyncProduct";
 import PrintfulProductService from "./printful-product";
 import {kebabCase} from "lodash";
+import {PrintfulCatalogProductRes, PrintfulCatalogProductVariant} from "../types/printfulCatalogProduct";
 
 interface ModifyVariantOptions {
     id?: number;
@@ -141,60 +143,125 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
 
     async syncProduct(printful_product_id: string | number) {
         try {
-            const { result: { sync_product, sync_variant } } = await this.printfulClient.get(`/sync/products/${printful_product_id}`, { store_id: this.storeId })
+            this.logger.info(`[medusa-plugin-printful]: Starting sync for product ${printful_product_id}.`);
 
-            this.logger.info(`[medusa-plugin-printful]: Syncing product ${printful_product_id}.`, );
+            const syncProductRes: GetSyncProductRes = await this.printfulClient.get(`/sync/products/${printful_product_id}`, { store_id: this.storeId });
+            if (!syncProductRes || syncProductRes.code !== 200 || !syncProductRes.result) {
+                return new Error(`API Error: Invalid response from sync product API. Code: ${syncProductRes?.code}`);
+            }
+
+            const { result: syncResult } = syncProductRes;
+
+            const sync_product: PrintfulSyncProductProduct = syncResult.sync_product;
+            const sync_variants: PrintfulSyncProductVariant[] = syncResult.sync_variants;
+
+            // this.logger.info(`[medusa-plugin-printful]: : ${sync_variants[0].product.product_id}`);
+
+            const catalogProductRes: PrintfulCatalogProductRes = await this.printfulCatalogService.getProduct(sync_variants[0].product.product_id);
+
+            // this.logger.info(`[medusa-plugin-printful]: : ${JSON.stringify(catalogProductRes)}`);
+            //
+            //
+            const { result: { product: catalog_product, variants: catalog_variants } } = catalogProductRes;
+
+            this.logger.info(`[medusa-plugin-printful]: Syncing product ${printful_product_id}.`,);
 
             const defaultShippingProfile = await this.shippingProfileService.retrieveDefault();
             const defaultSalesChannel = await this.salesChannelService.retrieveDefault();
 
-            const medusaVariants: CreateProductProductVariantInput[] = sync_variant.map((variant: SyncVariant) => {
+            const catalogVariantLookup: Record<string, PrintfulCatalogProductVariant> = {};
+
+            // console.log("Sync Variant IDs:", sync_variants.map(v => v.product.variant_id.toString()));
+            // console.log("Catalog Variant IDs:", catalog_variants.map(v => v.id.toString()));
+
+            catalog_variants.forEach(catalogVariant => {
+                catalogVariantLookup[catalogVariant.id.toString()] = catalogVariant;
+            });
+
+            const medusaVariants: CreateProductProductVariantInput[] = sync_variants.map((variant: PrintfulSyncProductVariant): CreateProductProductVariantInput => {
+
+                const correspondingCatalogVariant: PrintfulCatalogProductVariant = catalogVariantLookup[variant.product.variant_id.toString()];
+
+                const options: { value: string }[] = [];
+                if (correspondingCatalogVariant?.size) {
+                    options.push({value: correspondingCatalogVariant.size});
+                }
+                if (correspondingCatalogVariant?.color) {
+                    options.push({value: correspondingCatalogVariant.color});
+                }
+
                 return {
                     title: variant.name,
                     sku: variant.sku,
-                    external_id: variant.id,
                     inventory_quantity: 300,
+                    material: correspondingCatalogVariant ? JSON.stringify(correspondingCatalogVariant.material) : '',
+                    // options,
+                    // prices: [{
+                    //     amount: convertToInteger(variant.retail_price),
+                    //     currency_code: variant.currency.toLowerCase()
+                    // }],
                     metadata: {
-                        printful_variant_id: variant.id,
+                        printful: {
+                            variant_id: variant.id,
+                            catalog_variant_id: correspondingCatalogVariant.id,
+                            sync_product_id: variant.sync_product_id,
+                            preview_url: variant.files[0].preview_url,
+                        }
                     }
-                }
-            })
+                };
+            });
 
             const medusaProduct: CreateProductInput = {
                 title: sync_product.name,
                 handle: kebabCase(sync_product.name),
                 thumbnail: sync_product.thumbnail_url,
-                // options: buildProductOptions(),
-                // images: this.buildProductImages(printfulSyncVariants),
-                // tags: this.productTags ? productTags : [],
-                // categories: productCategories,
+                options: buildProductOptions(catalog_variants),
+                images: buildProductImages(sync_variants),
+                tags: buildProductTags(catalog_variants),
+                description: catalog_product.description,
+                type: { value: catalog_product.type },
+                // categories: TODO: implement / refactor
+                origin_country: catalog_product.origin_country,
                 profile_id: defaultShippingProfile.id,
-                external_id: sync_product.id,
-                sales_channels: [{id: defaultSalesChannel.id}],
+                external_id: sync_product.id as string,
+                variants: medusaVariants,
+                sales_channels: [
+                    {id: defaultSalesChannel.id}
+                ],
                 metadata: {
-                    printful_id: sync_product.id
+                    printful: {
+                        catalog_id: catalog_product.id,
+                        sync_product_id: sync_product.id,
+                        catalog_title: catalog_product.title,
+                        brand: catalog_product.brand,
+                        model: catalog_product.model,
+                    }
                 }
             }
 
-            this.logger.info(`[medusa-plugin-printful]: Medusa product: ${JSON.stringify(medusaProduct)}`);
+
+            this.logger.info(`[medusa-plugin-printful]: Attempting to create product with id: ${printful_product_id}.`);
 
             const product =  await this.productService.create(medusaProduct)
 
             if(product) {
-                const updatedExternalId = await this.printfulProductService.modifySyncProduct(
-                    sync_product.id,
-                    { name: sync_product.name, external_id: product.id }
-                )
-                return updatedExternalId;
+                this.logger.info(`[medusa-plugin-printful]: Successfully synced product ${printful_product_id}.`);
+                return await this.printfulProductService.modifySyncProduct(
+                    sync_product.id as string,
+                    {name: product.title, external_id: product.id}
+                );
             }
-
-        } catch (e)
-        {
-            this.logger.error(`[medusa-plugin-printful]: Error syncing product in Printful store: ${JSON.stringify(e)}`);
+        } catch (e) {
+            if (e instanceof Error) {
+                this.logger.error(`[medusa-plugin-printful]: Error syncing product in Printful store: ${e.message}`);
+                this.logger.error(`[medusa-plugin-printful]: Stack Trace: ${e.stack}`);
+            } else {
+                this.logger.error(`[medusa-plugin-printful]: An unknown error occurred while syncing product in Printful store.`);
+                this.logger.error(`[medusa-plugin-printful]: Error Object: ${JSON.stringify(e)}`);
+            }
             return e;
         }
     }
-
 }
 
 export default PrintfulPlatformSyncService

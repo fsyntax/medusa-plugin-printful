@@ -119,9 +119,7 @@ class PrintfulService extends TransactionBaseService {
     }
 
     convertToInteger(str) {
-        // replace comma with period
         let numStr = str.replace(",", ".");
-        // parse the number and round to the nearest integer
         return Math.round(parseFloat(numStr) * 100);
     }
 

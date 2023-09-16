@@ -1,5 +1,7 @@
 import {Logger, TransactionBaseService} from "@medusajs/medusa"
 import { PrintfulClient } from "../utils/printful-request"
+import {PrintfulCatalogVariantRes} from "../types/printfulCatalogVariant";
+import {PrintfulCatalogProductRes} from "../types/printfulCatalogProduct";
 
 class PrintfulCatalogService extends TransactionBaseService {
 
@@ -26,22 +28,23 @@ class PrintfulCatalogService extends TransactionBaseService {
         return result;
     }
 
-    async getProduct(product_id: string) {
-        const { code , result, error } = await this.printfulClient.get(`/products/${product_id}`, { store_id: this.printfulStoreId })
-
-        if(error) {
-            this.logger.error(`[medusa-plugin-printful]: Error fetching single product from Printful catalog: ${error.message}`);
-            return new Error(error.message)
-        }
-        return result;
+    async getProduct(product_id: string | number): Promise<PrintfulCatalogProductRes> {
+        return await this.printfulClient.get(`/products/${product_id}`)
+        // const { result, error } = await this.printfulClient.get(`/products/${product_id}`)
+        //
+        // if(error) {
+        //     this.logger.error(`[medusa-plugin-printful]: Error fetching single product from Printful catalog: ${error.message}`);
+        //     return result
+        // }
+        // return result;
     }
 
-    async getVariant(variant_id: string) {
+    async getVariant(variant_id: string | number): Promise<PrintfulCatalogVariantRes> {
         const { code , result, error } = await this.printfulClient.get(`/products/variant/${variant_id}`, {store_id: this.printfulStoreId});
 
         if(error){
             this.logger.error(`[medusa-plugin-printful]: Error product variant from Printful catalog: ${error.message}`);
-            return new Error(error.message)
+            return result
         }
         return result;
     }

@@ -39,14 +39,16 @@ export class PrintfulClient {
         };
     }
 
-    private buildQueryString(params: Record<string, string | number>): string {
+    private buildQueryString(params: Record<string, string | number | undefined>): string {
         return Object.keys(params).length
             ? '?' +
             Object.keys(params)
-                .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(params[k].toString())}`)
+                .filter((k) => params[k] !== undefined)
+                .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(params[k]!.toString())}`)
                 .join('&')
             : '';
     }
+
 
 
     async request({ method, endpoint, data = {}, params = {}, customHeaders = {} }: RequestOptions) {
@@ -63,7 +65,6 @@ export class PrintfulClient {
             requestConfig.body = JSON.stringify(data);
         }
 
-        console.log("URL: ", url)
         const response = await fetch(url, requestConfig);
 
         const json = await response.json();
