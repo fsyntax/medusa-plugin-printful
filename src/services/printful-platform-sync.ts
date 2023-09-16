@@ -1,18 +1,23 @@
 import {
     Logger,
+    Product,
     ProductService,
+    ProductVariant,
+    ProductVariantService,
     SalesChannelService,
     ShippingProfileService,
     TransactionBaseService
 } from "@medusajs/medusa"
 import {PrintfulClient} from "../utils/printful-request"
-import {buildProductImages, buildProductOptions, buildProductTags, convertToInteger} from "../utils/printful-utils";
 import PrintfulCatalogService from "./printful-catalog";
-import {CreateProductInput, CreateProductProductVariantInput} from "@medusajs/medusa/dist/types/product";
-import {GetSyncProductRes, PrintfulSyncProductProduct, PrintfulSyncProductVariant} from "../types/printfulSyncProduct";
 import PrintfulProductService from "./printful-product";
-import {kebabCase} from "lodash";
+import {GetSyncProductRes, PrintfulSyncProductProduct, PrintfulSyncProductVariant} from "../types/printfulSyncProduct";
 import {PrintfulCatalogProductRes, PrintfulCatalogProductVariant} from "../types/printfulCatalogProduct";
+import {buildProductImages, buildProductOptions, buildProductTags, convertToInteger} from "../utils/printful-utils";
+import {CreateProductInput, CreateProductProductVariantInput} from "@medusajs/medusa/dist/types/product";
+import { CreateProductVariantInput } from "@medusajs/medusa/dist/types/product-variant";
+import {EntityManager} from "typeorm";
+import {kebabCase} from "lodash";
 
 interface ModifyVariantOptions {
     id?: number;
@@ -39,11 +44,13 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
     private printfulProductService: PrintfulProductService;
     private salesChannelService: SalesChannelService;
     private shippingProfileService: ShippingProfileService;
+    private productVariantService: ProductVariantService;
 
     constructor(container, options) {
         super(container);
 
         this.productService = container.productService;
+        this.productVariantService = container.productVariantService;
         this.printfulClient = new PrintfulClient(options.printfulAccessToken);
         this.storeId = options.storeId;
         this.logger = container.logger;
@@ -178,38 +185,8 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
                 catalogVariantLookup[catalogVariant.id.toString()] = catalogVariant;
             });
 
-            const medusaVariants: CreateProductProductVariantInput[] = sync_variants.map((variant: PrintfulSyncProductVariant): CreateProductProductVariantInput => {
 
-                const correspondingCatalogVariant: PrintfulCatalogProductVariant = catalogVariantLookup[variant.product.variant_id.toString()];
 
-                const options: { value: string }[] = [];
-                if (correspondingCatalogVariant?.size) {
-                    options.push({value: correspondingCatalogVariant.size});
-                }
-                if (correspondingCatalogVariant?.color) {
-                    options.push({value: correspondingCatalogVariant.color});
-                }
-
-                return {
-                    title: variant.name,
-                    sku: variant.sku,
-                    inventory_quantity: 300,
-                    material: correspondingCatalogVariant ? JSON.stringify(correspondingCatalogVariant.material) : '',
-                    // options,
-                    // prices: [{
-                    //     amount: convertToInteger(variant.retail_price),
-                    //     currency_code: variant.currency.toLowerCase()
-                    // }],
-                    metadata: {
-                        printful: {
-                            variant_id: variant.id,
-                            catalog_variant_id: correspondingCatalogVariant.id,
-                            sync_product_id: variant.sync_product_id,
-                            preview_url: variant.files[0].preview_url,
-                        }
-                    }
-                };
-            });
 
             const medusaProduct: CreateProductInput = {
                 title: sync_product.name,
@@ -224,7 +201,7 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
                 origin_country: catalog_product.origin_country,
                 profile_id: defaultShippingProfile.id,
                 external_id: sync_product.id as string,
-                variants: medusaVariants,
+                // variants: medusaVariants,
                 sales_channels: [
                     {id: defaultSalesChannel.id}
                 ],
@@ -242,15 +219,83 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
 
             this.logger.info(`[medusa-plugin-printful]: Attempting to create product with id: ${printful_product_id}.`);
 
-            const product =  await this.productService.create(medusaProduct)
+            const newCreatedProduct: Product = await this.atomicPhase_(async (manager: EntityManager) => {
+                const product =  await this.productService.create(medusaProduct)
 
-            if(product) {
-                this.logger.info(`[medusa-plugin-printful]: Successfully synced product ${printful_product_id}.`);
-                return await this.printfulProductService.modifySyncProduct(
-                    sync_product.id as string,
-                    {name: product.title, external_id: product.id}
-                );
-            }
+                async function getProductOptions(optionTitle: string, product_id: string ) {
+                    const productOption = await this.productService.retrieveOptionByTitle(optionTitle, product_id);
+
+                }
+
+                // TODO: refactor, not working
+                const productOptionsId = async (title: string, id: string)   => {
+                    const option =  await this.productService.retrieveOptionByTitle(title, id);
+                    return option.id;
+                }
+
+                if (product) {
+                    this.logger.info(`[medusa-plugin-printful]: Successfully created product ${printful_product_id}! Attempting to create variants.`);
+
+                    const medusaVariantPromises: Promise<CreateProductVariantInput>[] = sync_variants.map(async (variant: PrintfulSyncProductVariant) => {
+                        const correspondingCatalogVariant: PrintfulCatalogProductVariant = catalogVariantLookup[variant.product.variant_id.toString()];
+                        const options: { option_id: string, value: string }[] = [];
+
+                        if (correspondingCatalogVariant?.size) {
+                            options.push({
+                                option_id: await productOptionsId(correspondingCatalogVariant.size, product.id) as string,
+                                value: correspondingCatalogVariant.size
+                            });
+                        }
+
+                        if (correspondingCatalogVariant?.color) {
+                            options.push({
+                                option_id: await productOptionsId(correspondingCatalogVariant.color, product.id) as string,
+                                value: correspondingCatalogVariant.color
+                            });
+                        }
+
+                        return {
+                            title: variant.name,
+                            sku: variant.sku,
+                            inventory_quantity: 300,
+                            material: correspondingCatalogVariant ? JSON.stringify(correspondingCatalogVariant.material) : '',
+                            options,
+                            prices: [{
+                                amount: convertToInteger(variant.retail_price),
+                                currency_code: variant.currency.toLowerCase()
+                            }],
+                            metadata: {
+                                printful: {
+                                    variant_id: variant.id,
+                                    catalog_variant_id: correspondingCatalogVariant.id,
+                                    sync_product_id: variant.sync_product_id,
+                                    preview_url: variant.files[0].preview_url,
+                                }
+                            }
+                        };
+                    });
+
+                    const medusaVariants: CreateProductVariantInput[] = await Promise.all(medusaVariantPromises);
+
+                    const variants = await Promise.all(medusaVariants.map(async (variant: CreateProductVariantInput) => {
+                        return await this.productVariantService.create(product.id as string, variant);
+                    }));
+
+                    if (variants) {
+                        return product;
+                    }
+                }
+
+            });
+
+            if(newCreatedProduct) {
+                    this.logger.info(`[medusa-plugin-printful]: Successfully synced ${newCreatedProduct.title}! 🚀`);
+                    return await this.printfulProductService.modifySyncProduct(
+                        sync_product.id as string,
+                        {name: newCreatedProduct.title, external_id: newCreatedProduct.id}
+                    );
+                }
+
         } catch (e) {
             if (e instanceof Error) {
                 this.logger.error(`[medusa-plugin-printful]: Error syncing product in Printful store: ${e.message}`);
