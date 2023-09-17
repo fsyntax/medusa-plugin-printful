@@ -2,10 +2,25 @@ import express, { Router } from "express"
 import { getConfigFile, parseCorsOrigins} from "medusa-core-utils";
 import { ConfigModule } from "@medusajs/medusa/dist/types/global";
 import cors from "cors";
+import { registerOverriddenValidators } from "@medusajs/medusa"
+import {
+  AdminPostProductsReq as MedusaAdminPostProductsReq,
+} from "@medusajs/medusa/dist/api/routes/admin/products/create-product"
+import { IsString } from "class-validator"
+
+
+
 
 export default (rootDirectory, options) => {
   const storeRouter = Router()
   const adminRouter = Router()
+
+  class AdminPostProductsReq extends MedusaAdminPostProductsReq {
+    @IsString()
+    custom_field: string
+  }
+
+  registerOverriddenValidators(AdminPostProductsReq)
 
   storeRouter.use(express.json())
   storeRouter.use(express.urlencoded({ extended: true }))

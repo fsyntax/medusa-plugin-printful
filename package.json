@@ -50,6 +50,7 @@
     "@typescript-eslint/parser": "^6.7.0",
     "babel-eslint": "^10.1.0",
     "babel-preset-medusa-package": "^1.1.19",
+    "class-validator": "^0.14.0",
     "cross-env": "^7.0.3",
     "eslint": "^8.49.0",
     "lodash": "^4.17.21",
