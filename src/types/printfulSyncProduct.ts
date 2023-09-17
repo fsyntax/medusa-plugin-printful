@@ -73,3 +73,4 @@ export interface GetSyncProductRes {
         reason?: string;
     }
 }
+

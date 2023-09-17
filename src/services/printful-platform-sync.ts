@@ -276,6 +276,7 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
                                 inventory_quantity: 300,
                                 // TODO: find a more elegant solution for material
                                 material: correspondingCatalogVariant.material.length > 0 ? correspondingCatalogVariant.material[0].name : null,
+                                printful_id: variant.id.toString(),
                                 options,
                                 prices: [{
                                     amount: convertToInteger(variant.retail_price),

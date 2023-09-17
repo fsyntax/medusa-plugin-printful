@@ -14,7 +14,18 @@ declare module "@medusajs/medusa/dist/types/product" {
         synced: boolean;
         printful_id?: string;
     }
-    interface PriceProduct {
-        synced: boolean;
+}
+
+declare module "@medusajs/medusa/dist/models/product-variant" {
+    interface ProductVariant {
+        printful_id?: string;
+    }
+}
+declare module "@medusajs/medusa/dist/models/product-variant" {
+    interface CreateProductVariantInput {
+        printful_id?: string;
+    }
+    interface UpdateProductVariantInput {
+        printful_id?: string;
     }
 }

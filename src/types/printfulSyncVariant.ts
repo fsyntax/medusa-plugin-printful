@@ -52,3 +52,14 @@ export interface GetSyncVariantRes {
         reason?: string;
     };
 }
+
+export interface ModifyPrintfulSyncVariantPayload {
+    id?: number;
+    external_id?: string;
+    variant_id?: number;
+    retail_price?: string;
+    is_ignored?: boolean;
+    sku?: string;
+    files?: File[];
+    options?: Options[];
+}
