@@ -7,4 +7,10 @@ export class Product extends MedusaProduct {
         type: 'boolean'
     })
     synced: boolean
+
+    @Column({
+        type: 'text',
+        nullable: true
+    })
+    printful_id: string
 }

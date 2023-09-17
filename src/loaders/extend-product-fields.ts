@@ -5,9 +5,11 @@ export default async function () {
     imports.allowedStoreProductsFields = [
         ...imports.allowedStoreProductsFields,
         "synced",
+        "printful_id"
     ]
     imports.defaultStoreProductsFields = [
         ...imports.defaultStoreProductsFields,
         "synced",
+        "printful_id"
     ]
 }

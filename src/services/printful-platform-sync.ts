@@ -189,6 +189,7 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
                 profile_id: defaultShippingProfile.id,
                 external_id: sync_product.id as string,
                 synced: true,
+                printful_id: sync_product.id as string,
                 sales_channels: [
                     { id: defaultSalesChannel.id }
                 ],
@@ -207,7 +208,6 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
 
             try {
                 productAlreadyExists = await this.productService.retrieveByExternalId(sync_product.id as string);
-                console.log("Product already exists:", productAlreadyExists)
             } catch (e) {
                 if (e.message === `Product with external_id: ${sync_product.id as string} was not found`) {
                     this.logger.info(`[medusa-plugin-printful]: Product with id ${printful_product_id} does not exist in Medusa. Proceeding to create a new one.`);
@@ -224,7 +224,9 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
 
                     { external_id: sync_product.id as string,
                         //@ts-ignore
-                        synced: true }
+                        printful_id: sync_product.id as string,
+                        synced: true
+                    }
                 );
 
                 if(syncedMedusaProduct) {
