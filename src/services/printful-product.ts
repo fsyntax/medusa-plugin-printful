@@ -2,10 +2,20 @@ import { Logger, ProductService, TransactionBaseService } from "@medusajs/medusa
 import { PrintfulClient } from "../utils/printful-request"
 
 interface SyncProductModifyPayload {
-    name: string;
-    thumbnail?: string;
-    external_id?: string | number;
-    is_ignored?: boolean;
+    sync_product: {
+        name: string;
+        thumbnail?: string;
+        external_id?: string | number;
+        is_ignored?: boolean;
+    }
+    sync_variants?: {
+        id: string;
+        external_id?: string;
+        variant_id: string | number;
+        retail_price?: string;
+        is_ignored?: boolean
+        sku?: string
+    }
 }
 
 class PrintfulProductService extends TransactionBaseService {
@@ -71,15 +81,17 @@ class PrintfulProductService extends TransactionBaseService {
             `/store/products/${product_id}`,
             {
                 store_id: this.printfulStoreId,
-                sync_product: {...payload},
+                ...payload,
             });
+
 
         if(error){
             this.logger.error(`[medusa-plugin-printful]: Error modifying sync product in Printful store: Code: ${code} / ${result}`);
             return new Error(result)
+        } else {
+            this.logger.info(`[medusa-plugin-printful]: Successfully modified sync product ${product_id} in Printful store.`);
+            return result;
         }
-
-        return result;
     }
 
     async getSyncVariant(variant_id: string) {

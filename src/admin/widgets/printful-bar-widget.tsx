@@ -1,5 +1,5 @@
 import type { WidgetConfig,  ProductDetailsWidgetProps } from "@medusajs/admin"
-import {Container, Heading, Text, Badge, Button} from "@medusajs/ui";
+import {Container, Text, Badge, Button} from "@medusajs/ui";
 import {MedusaProvider, useAdminCustomPost, useProduct} from "medusa-react";
 import { QueryClient } from "@tanstack/react-query";
 import React, {useEffect, useState} from "react";
@@ -65,12 +65,12 @@ const PrintfulBarWidget = ({ product, notify }: ProductDetailsWidgetProps) => {
                         <div className="flex items-center gap-3">
                             {isSynced ? (
                                 <div className="flex items-center gap-3">
-                                    <Badge size="small" color="green">
+                                    <Badge size="small" color={syncIsLoading ? 'orange' : 'green'}>
                                         <EllipseGreenSolid />
-                                        <Text>Synced</Text>
+                                        <Text>{syncIsLoading ? 'Syncing' : 'Synced'}</Text>
                                     </Badge>
                                     <Button size="small" variant="secondary" onClick={handleSync} isLoading={syncIsLoading}>
-                                        <Text>{syncIsLoading ? 'Syncing' : 'Resync'}</Text>
+                                        <Text>Resync</Text>
                                     </Button>
                                 </div>
                             ) : (
