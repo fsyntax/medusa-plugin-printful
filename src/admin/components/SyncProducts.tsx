@@ -1,4 +1,4 @@
-import {Container, Heading, Text} from "@medusajs/ui";
+import { Container, Heading, Text } from "@medusajs/ui";
 import React from "react";
 import { QueryClient } from "@tanstack/react-query";
 import {MedusaProvider, useAdminCustomQuery} from "medusa-react";

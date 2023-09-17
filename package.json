@@ -46,10 +46,12 @@
     "@medusajs/ui-preset": "^1.0.0",
     "@types/node": "^20.4.8",
     "@types/react": "^18.2.21",
+    "@typescript-eslint/eslint-plugin": "^6.7.0",
+    "@typescript-eslint/parser": "^6.7.0",
     "babel-eslint": "^10.1.0",
     "babel-preset-medusa-package": "^1.1.19",
     "cross-env": "^7.0.3",
-    "eslint": "^8.37.0",
+    "eslint": "^8.49.0",
     "lodash": "^4.17.21",
     "rimraf": "^5.0.1",
     "typescript": "^5.0.4"
