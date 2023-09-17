@@ -59,6 +59,15 @@ export default (rootDirectory, options) => {
     return res.json(product);
   })
 
+  adminRouter.options('/admin/printful/sync_products/:product_id/desync', cors(adminCorsOptions))
+  adminRouter.post('/admin/printful/sync_products/:product_id/desync', cors(adminCorsOptions), async (req, res) => {
+    console.log("Request Body:", req.body);  // Debugging line
+    console.log("Request Params:", req.params);  // Debugging line
+    console.log("Request Query:", req.query);  // Debugging line
+    const printfulPlatformSyncService = req.scope.resolve('printfulPlatformSyncService')
+    const result = await printfulPlatformSyncService.desyncProduct(req.params.product_id, req.body.name)
+    return res.json(result);
+  })
 
   adminRouter.options('/admin/printful/sync_variant/:variant_id', cors(adminCorsOptions))
     adminRouter.get('/admin/printful/sync_variant/:variant_id', cors(adminCorsOptions), async (req, res) => {

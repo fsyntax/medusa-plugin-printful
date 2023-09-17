@@ -65,6 +65,7 @@ class PrintfulProductService extends TransactionBaseService {
 
 
     async modifySyncProduct(product_id: string, payload: SyncProductModifyPayload) {
+        this.logger.info(`[medusa-plugin-printful]: Modifying sync product ${product_id} in Printful store with the following payload: ${JSON.stringify(payload, null, 2)})}`);
 
         const { code , result, error } = await this.printfulClient.put(
             `/store/products/${product_id}`,

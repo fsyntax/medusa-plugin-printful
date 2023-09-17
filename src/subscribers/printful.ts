@@ -1,5 +1,7 @@
 import {FulFillmentItemType} from "@medusajs/medusa/dist/types/fulfillment";
 import {blue, blueBright, green, greenBright, red} from "colorette";
+import {Logger} from "@medusajs/medusa";
+import PrintfulProductService from "../services/printful-product";
 
 
 class PrintfulSubscriber {
@@ -12,9 +14,10 @@ class PrintfulSubscriber {
     private productVariantService: any;
     private paymentService: any;
     private productsQueueService: any;
+    private logger: Logger;
+    private printfulProductService: PrintfulProductService;
 
-    constructor({
-                    eventBusService,
+    constructor({  eventBusService,
                     orderService,
                     printfulSyncService,
                     productService,
@@ -23,9 +26,13 @@ class PrintfulSubscriber {
                     printfulService,
                     productVariantService,
                     paymentService,
-        productsQueueService
+                    productsQueueService,
+                    printfulProductService,
+                    logger
                 }) {
         this.printfulSyncService = printfulSyncService;
+        this.printfulProductService = printfulProductService;
+        this.logger = logger;
         this.productService = productService
         this.printfulFulfillmentService = printfulFulfillmentService;
         this.orderService_ = orderService;
@@ -39,8 +46,9 @@ class PrintfulSubscriber {
         eventBusService.subscribe("printful.product_deleted", this.handlePrintfulProductDeleted);
         eventBusService.subscribe("printful.order_updated", this.handlePrintfulOrderUpdated);
         eventBusService.subscribe("printful.order_canceled", this.handlePrintfulOrderCanceled);
-
         eventBusService.subscribe("printful.package_shipped", this.handlePrintfulPackageShipped);
+
+        // eventBusService.subscribe("product.deleted", this.handleMedusaProductDeleted);
 
         eventBusService.subscribe("order.placed", this.handleOrderCreated);
         eventBusService.subscribe("order.updated", this.handleOrderUpdated);
@@ -177,6 +185,14 @@ class PrintfulSubscriber {
 
     handleMedusaProductUpdated = async (data: any) => {
         console.log("From subscriber - processing handleMedusaProductUpdated: -- NOT YET IMPLEMENTED", data)
+    }
+
+    handleMedusaProductDeleted = async (data: any) => {
+        this.logger.info("[medusa-plugin-printful]: Received a product.deleted event from Medusa, desyncing product.")
+        const product = await this.productService.retrieve(data.id)
+        if(product) {
+            return await this.printfulProductService.modifySyncProduct(product.external_id, {name: product.title, external_id: null})
+        }
     }
 
     handleMedusaVariantUpdated = async (data: any) => {

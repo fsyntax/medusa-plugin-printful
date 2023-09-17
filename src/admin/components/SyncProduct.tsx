@@ -30,6 +30,10 @@ const SyncProduct = (item: PrintfulSyncProductRes) => {
         [`printful/sync_products/${item.id}/sync`],
     );
 
+    const { mutate: desyncMutate, isLoading: desyncIsLoading } = useAdminCustomPost(
+        `printful/sync_products/${item.id}/desync`,
+        [`printful/sync_products/${item.id}/desync`],
+    )
 
     const handleModify = (args: any) => {
         return mutate(args, {
@@ -57,6 +61,17 @@ const SyncProduct = (item: PrintfulSyncProductRes) => {
         });
     };
 
+    const handleDesync = () => {
+        return desyncMutate({ name: currentName }, {
+            onSuccess: (data) => {
+                console.log("Product desynced successfully:", data);
+                // You can update the UI here
+            },
+            onError: (error) => {
+                console.log("An error occurred during desync:", error);
+            },
+        });
+    }
 
     return (
         <div className="p-3 relative border border-gray-200 rounded-lg" key={item.id}>
@@ -118,6 +133,15 @@ const SyncProduct = (item: PrintfulSyncProductRes) => {
                     <Badge>Variants: {item.variants}</Badge>
                     <Badge>Synced: {item.variants}</Badge>
                 </div>
+            <Button
+                variant="danger"
+                className="w-full mt-2"
+                onClick={handleDesync}
+                isLoading={desyncIsLoading}
+                size="small"
+            >
+                Desync
+            </Button>
             </div>
     );
 };

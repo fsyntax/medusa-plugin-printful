@@ -26,8 +26,9 @@ const SyncProductsList = () => {
         { limit: 100 }
     );
 
-    const dataArray = Object.values(data || {}) as PrintfulSyncProductRes[];
-console.log(dataArray)
+    const dataArray = Object.values(data || {}).filter((item: any) => item && typeof item === 'object' && item.id && item.name) as PrintfulSyncProductRes[];
+
+
     return (
         <>
             {isLoading ? (
