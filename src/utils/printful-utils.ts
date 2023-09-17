@@ -1,5 +1,4 @@
 import {PrintfulCatalogVariant} from "../types/printfulCatalogVariant";
-import {CreateProductProductOption, CreateProductProductTagInput} from "@medusajs/medusa/dist/types/product";
 import {PrintfulSyncProductVariant} from "../types/printfulSyncProduct";
 
 export function buildProductImages(sync_variant: PrintfulSyncProductVariant[]): string[] {
@@ -10,7 +9,7 @@ export function buildProductImages(sync_variant: PrintfulSyncProductVariant[]): 
     )).filter((url, index, arr) => arr.indexOf(url) === index && url !== null && url !== '');
 }
 
-export function buildProductOptions(catalogVariants: PrintfulCatalogVariant[]): CreateProductProductOption[] {
+export function buildProductOptions(catalogVariants: PrintfulCatalogVariant[]) {
     const hasSize = catalogVariants.some(({ size }) => size !== null);
     const hasColor = catalogVariants.some(({ color }) => color !== null);
 
@@ -20,7 +19,7 @@ export function buildProductOptions(catalogVariants: PrintfulCatalogVariant[]): 
     ];
 }
 
-export function buildProductTags(catalogVariants: PrintfulCatalogVariant[]): CreateProductProductTagInput[] {
+export function buildProductTags(catalogVariants: PrintfulCatalogVariant[]) {
     return Object.keys(
         catalogVariants.reduce((acc, variant) => {
             const { size, color } = variant;

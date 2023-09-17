@@ -18,8 +18,9 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/"],
+  "include": ["src/", "src/index.d.ts"],
   "exclude": [
+    "_bin",
     "dist",
     "build",
     ".cache",

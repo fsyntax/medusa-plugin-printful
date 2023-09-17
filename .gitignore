@@ -9,3 +9,4 @@ yarn.lock
 .github/
 .idea/
 .eslintignore
+_bin

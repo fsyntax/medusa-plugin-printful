@@ -14,14 +14,10 @@ import PrintfulProductService from "./printful-product";
 import {GetSyncProductRes, PrintfulSyncProductProduct, PrintfulSyncProductVariant} from "../types/printfulSyncProduct";
 import {PrintfulCatalogProductRes, PrintfulCatalogProductVariant} from "../types/printfulCatalogProduct";
 import {buildProductImages, buildProductOptions, buildProductTags, convertToInteger} from "../utils/printful-utils";
-import {
-    CreateProductInput,
-    CreateProductProductVariantInput,
-    UpdateProductInput
-} from "@medusajs/medusa/dist/types/product";
 import { CreateProductVariantInput } from "@medusajs/medusa/dist/types/product-variant";
 import {EntityManager} from "typeorm";
 import {kebabCase} from "lodash";
+import { UpdateProductInput, CreateProductInput } from "@medusajs/medusa/dist/types/product";
 
 interface ModifyVariantOptions {
     id?: number;
@@ -33,7 +29,6 @@ interface ModifyVariantOptions {
     files?: any[];
     options?: any[];
 }
-
 
 
 
@@ -180,6 +175,7 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
             });
 
             const medusaProduct: CreateProductInput = {
+                // @ts-ignore
                 title: sync_product.name,
                 handle: kebabCase(sync_product.name),
                 thumbnail: sync_product.thumbnail_url,
@@ -192,9 +188,9 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
                 origin_country: catalog_product.origin_country,
                 profile_id: defaultShippingProfile.id,
                 external_id: sync_product.id as string,
-                // variants: medusaVariants,
+                synced: true,
                 sales_channels: [
-                    {id: defaultSalesChannel.id}
+                    { id: defaultSalesChannel.id }
                 ],
                 metadata: {
                     printful: {
@@ -211,6 +207,7 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
 
             try {
                 productAlreadyExists = await this.productService.retrieveByExternalId(sync_product.id as string);
+                console.log("Product already exists:", productAlreadyExists)
             } catch (e) {
                 if (e.message === `Product with external_id: ${sync_product.id as string} was not found`) {
                     this.logger.info(`[medusa-plugin-printful]: Product with id ${printful_product_id} does not exist in Medusa. Proceeding to create a new one.`);
@@ -222,7 +219,13 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
             if(productAlreadyExists) {
                 this.logger.info(`[medusa-plugin-printful]: Product with id ${printful_product_id} already exists in Medusa. Attempting to sync & update.`);
 
-                const syncedMedusaProduct = await this.productService.update(productAlreadyExists.id as string, { external_id: sync_product.id as string });
+                const syncedMedusaProduct: Product = await this.productService.update(
+                    productAlreadyExists.id as string,
+
+                    { external_id: sync_product.id as string,
+                        //@ts-ignore
+                        synced: true }
+                );
 
                 if(syncedMedusaProduct) {
                     this.logger.success('[product-sync]', `[medusa-plugin-printful]: Successfully synced ${syncedMedusaProduct.title}! 🚀`);
@@ -236,6 +239,7 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
                 this.logger.info(`[medusa-plugin-printful]: Attempting to create product with id: ${printful_product_id}.`);
 
                 const newCreatedProduct: Product = await this.atomicPhase_(async (manager: EntityManager) => {
+                    // @ts-ignore
                     const product = await this.productService.create(medusaProduct)
 
                     const productOptionLookup: Record<string, string> = {};
@@ -323,8 +327,16 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
         try {
             this.logger.info(`[medusa-plugin-printful]: Starting desync for product ${printful_product_id}.`);
 
-          const result =  await this.printfulProductService.modifySyncProduct(printful_product_id.toString(), { name: product_name, external_id: '' });
-          this.logger.info(`[medusa-plugin-printful]: Successfully desynced product ${product_name}! Bye Bye!`);
+            const medusaProduct = await this.productService.retrieveByExternalId(printful_product_id.toString());
+            if(medusaProduct) {
+                // @ts-ignore
+                const updatedMedusaProduct = await this.productService.update(medusaProduct.id as string, { synced: false });
+                if(updatedMedusaProduct) {
+                    this.logger.info(`[medusa-plugin-printful]: Successfully desynced "${updatedMedusaProduct.title}" from Printful!`);
+                    return await this.printfulProductService.modifySyncProduct(printful_product_id.toString(), { name: product_name, external_id: '' });
+
+                }
+            }
 
         } catch (e) {
             if (e instanceof Error) {

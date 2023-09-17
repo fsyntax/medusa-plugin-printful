@@ -1,7 +1,7 @@
-import { RouteConfig } from "@medusajs/admin";
+import {RouteConfig, RouteProps} from "@medusajs/admin";
 import SyncProducts from "../../components/SyncProducts";
 
-const PrintfulPage = () => {
+const PrintfulPage = ({ notify }: RouteProps) => {
     return (
         <div>
             <SyncProducts/>

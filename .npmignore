@@ -10,3 +10,4 @@ src/
 .github/
 .env
 *.log
+_bin
