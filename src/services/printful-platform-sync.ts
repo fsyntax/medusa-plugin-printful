@@ -1,6 +1,6 @@
 import {
     Logger,
-    Product,
+    Product, ProductOption,
     ProductService,
     ProductVariant,
     ProductVariantService,
@@ -217,21 +217,17 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
             }
 
 
+
+
             this.logger.info(`[medusa-plugin-printful]: Attempting to create product with id: ${printful_product_id}.`);
 
             const newCreatedProduct: Product = await this.atomicPhase_(async (manager: EntityManager) => {
                 const product =  await this.productService.create(medusaProduct)
 
-                async function getProductOptions(optionTitle: string, product_id: string ) {
-                    const productOption = await this.productService.retrieveOptionByTitle(optionTitle, product_id);
-
-                }
-
-                // TODO: refactor, not working
-                const productOptionsId = async (title: string, id: string)   => {
-                    const option =  await this.productService.retrieveOptionByTitle(title, id);
-                    return option.id;
-                }
+                const productOptionLookup: Record<string, string> = {};
+                product.options.forEach(option => {
+                    productOptionLookup[option.title] = option.id;
+                });
 
                 if (product) {
                     this.logger.info(`[medusa-plugin-printful]: Successfully created product ${printful_product_id}! Attempting to create variants.`);
@@ -242,14 +238,14 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
 
                         if (correspondingCatalogVariant?.size) {
                             options.push({
-                                option_id: await productOptionsId(correspondingCatalogVariant.size, product.id) as string,
+                                option_id: productOptionLookup["size"],
                                 value: correspondingCatalogVariant.size
                             });
                         }
 
                         if (correspondingCatalogVariant?.color) {
                             options.push({
-                                option_id: await productOptionsId(correspondingCatalogVariant.color, product.id) as string,
+                                option_id: productOptionLookup["color"],
                                 value: correspondingCatalogVariant.color
                             });
                         }
@@ -258,7 +254,8 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
                             title: variant.name,
                             sku: variant.sku,
                             inventory_quantity: 300,
-                            material: correspondingCatalogVariant ? JSON.stringify(correspondingCatalogVariant.material) : '',
+                            // TODO: find a more elegant solution for material
+                            material: correspondingCatalogVariant.material.length > 0 ? correspondingCatalogVariant.material[0].name : null,
                             options,
                             prices: [{
                                 amount: convertToInteger(variant.retail_price),
@@ -289,7 +286,7 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
             });
 
             if(newCreatedProduct) {
-                    this.logger.info(`[medusa-plugin-printful]: Successfully synced ${newCreatedProduct.title}! 🚀`);
+                    this.logger.success('[product-creation]',`[medusa-plugin-printful]: Successfully synced ${newCreatedProduct.title}! 🚀`);
                     return await this.printfulProductService.modifySyncProduct(
                         sync_product.id as string,
                         {name: newCreatedProduct.title, external_id: newCreatedProduct.id}
