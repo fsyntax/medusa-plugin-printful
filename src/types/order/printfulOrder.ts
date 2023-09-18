@@ -57,16 +57,25 @@ export interface CreatePrintfulOrderRes {
 
 export interface GetPrintfulOrderReq {
     order_id: string;
-    external_id?: string;
-    store_id?: string;
-    status: string
-    created_at: string;
-    updated_at: string;
-    recipient: CreatePrintfulOrderRecipient
-
 }
 
-interface GetPrintfulOrderRes {
+export interface CreatePrintfulOrderRecipient {
+    name?: string;
+    company?: string;
+    address1?: string;
+    address2?: string;
+    city?: string;
+    state_code?: string;
+    state_name?: string;
+    country_code?: string;
+    country_name?: string;
+    zip?: string;
+    phone?: string;
+    email?: string;
+    tax_number?: string;
+}
+
+export interface GetPrintfulOrderRes {
     data: {
         id: number;
         external_id: string;
@@ -112,31 +121,30 @@ interface GetPrintfulOrderRes {
             retail_price: string;
             currency: string;
             retail_currency: string;
-            _links?: Record<string, unknown>;
+            _links?: Links;
         }[];
         customization?: Record<string, unknown>;
-        _links?: {
-            self?: Record<string, unknown>;
-            order_confirmation?: Record<string, unknown>;
-            order_items?: Record<string, unknown>;
-            shipments?: Record<string, unknown>;
-        };
+        _links?: Links;
     };
 }
 
+export interface ConfirmPrintfulOrderRes extends GetPrintfulOrderRes {
+    "_links": Links;
+}
 
-export interface CreatePrintfulOrderRecipient {
-    name?: string;
-    company?: string;
-    address1?: string;
-    address2?: string;
-    city?: string;
-    state_code?: string;
-    state_name?: string;
-    country_code?: string;
-    country_name?: string;
-    zip?: string;
-    phone?: string;
-    email?: string;
-    tax_number?: string;
+interface Links {
+    "_links": {
+        "self"?: {
+            "href": string;
+        }
+        "order"?: {
+            "href": string;
+        }
+        "order_items"?: {
+            "href": string;
+        }
+        "shipments"?: {
+            "href": string;
+        }
+    }
 }

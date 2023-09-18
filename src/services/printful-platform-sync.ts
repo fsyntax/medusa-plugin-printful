@@ -31,6 +31,13 @@ interface ModifyVariantOptions {
 
 
 
+/**
+ * PrintfulPlatformSyncService handles product sync between Medusa and Printful.
+ * Attention: This service still uses all methods from Printful API v1 - v2, wich will merge products and ecommerce platform api together, is targeted to Q4 2023.
+ *
+ * @class PrintfulPlatformSyncService
+ * @extends {TransactionBaseService}
+ */
 
 class PrintfulPlatformSyncService extends TransactionBaseService {
 
