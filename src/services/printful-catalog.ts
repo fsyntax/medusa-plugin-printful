@@ -3,6 +3,14 @@ import { PrintfulClient } from "../utils/printful-request"
 import {PrintfulCatalogVariantRes} from "../types/printfulCatalogVariant";
 import {PrintfulCatalogProductRes} from "../types/printfulCatalogProduct";
 
+
+/**
+ * PrintfulCatalogService is responsible for fetching catalog data from the Printful API.
+ * Attention: It uses methods from both Printful API v1 and v2.
+ *
+ * @class PrintfulCatalogService
+ * @extends {TransactionBaseService}
+ */
 class PrintfulCatalogService extends TransactionBaseService {
 
     private printfulClient: PrintfulClient;
