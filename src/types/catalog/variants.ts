@@ -1,8 +1,13 @@
 
 import { Variant } from '../shared';
 
-export interface GetVariantResponse {
+export interface GetProductVariantResponse {
     data: Variant;
+    error?: {
+        reason: string
+        message: string
+    },
+    code?: number;
     _links: {
         self: {
             href: string;
@@ -32,6 +37,11 @@ export interface GetProductVariantsRequest {
 
 export interface GetProductVariantsResponse {
     data: Variant[];
+    error?: {
+        reason: string
+        message: string
+    },
+    code?: number;
     paging: {
         total: number;
         offset: number;

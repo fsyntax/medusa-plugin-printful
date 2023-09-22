@@ -1,7 +1,9 @@
-import {Logger, TransactionBaseService} from "@medusajs/medusa"
+import { Logger, TransactionBaseService } from "@medusajs/medusa"
 import { PrintfulClient } from "../utils/printful-request"
-import {PrintfulCatalogVariantRes} from "../types/printfulCatalogVariant";
-import {PrintfulCatalogProductRes} from "../types/printfulCatalogProduct";
+import {GetProductResponse, GetProductsResponse} from "../types/catalog/products";
+import { Product, Variant } from "../types/shared";
+import {GetProductSizeGuideResponse} from "../types/catalog/size-guide";
+import {GetProductVariantResponse, GetProductVariantsResponse} from "../types/catalog/variants";
 
 
 /**
@@ -26,46 +28,87 @@ class PrintfulCatalogService extends TransactionBaseService {
     }
 
 
-    async getProducts(category_id?: string){
-        const { code , result, error } = await this.printfulClient.get('/products', { store_id: this.printfulStoreId });
-
-        if(error){
-            this.logger.error(`[medusa-plugin-printful]: Error fetching products from Printful catalog: ${error.message}`);
-            return new Error(error.message)
+    async getProducts(category_id?: string): Promise<Product[] | Error>{
+        try {
+            const { data, error }: GetProductsResponse = await this.printfulClient.get('/v2/catalog-products', { store_id: this.printfulStoreId });
+            if(!data){
+                this.logger.error(`[medusa-plugin-printful]: Error fetching products from Printful catalog: ${error.message}`);
+                return new Error(error.message)
+            }
+            return data;
         }
-        return result;
-    }
-
-    async getProduct(product_id: string | number): Promise<PrintfulCatalogProductRes> {
-        return await this.printfulClient.get(`/products/${product_id}`)
-        // const { result, error } = await this.printfulClient.get(`/products/${product_id}`)
-        //
-        // if(error) {
-        //     this.logger.error(`[medusa-plugin-printful]: Error fetching single product from Printful catalog: ${error.message}`);
-        //     return result
-        // }
-        // return result;
-    }
-
-    async getVariant(variant_id: string | number): Promise<PrintfulCatalogVariantRes> {
-        const { code , result, error } = await this.printfulClient.get(`/products/variant/${variant_id}`, {store_id: this.printfulStoreId});
-
-        if(error){
-            this.logger.error(`[medusa-plugin-printful]: Error product variant from Printful catalog: ${error.message}`);
-            return result
+        catch (e) {
+            this.logger.error(`[medusa-plugin-printful]: Error fetching product from catalog: ${e.message}`);
+            this.logger.error(`[medusa-plugin-printful]: Stack Trace: ${e.stack}`);
+            return e
         }
-        return result;
     }
 
-    async getProductSizeguide(product_id: string, unit?: "inches" | "cm") {
-        const { code , result, error } = await this.printfulClient.get(`/products/${product_id}/sizes?${unit ?? 'cm'}`, {store_id: this.printfulStoreId});
-
-        if(error){
-            this.logger.error(`[medusa-plugin-printful]: Error fetching product size guide from Printful catalog: ${error.message}`);
-            return new Error(error.message)
+    async getProduct(product_id: string | number): Promise<Product | Error> {
+        try {
+            const { data, error }: GetProductResponse = await this.printfulClient.get(`/v2/catalog-products/${product_id}`)
+            if(error) {
+                this.logger.error(`[medusa-plugin-printful]: Error fetching product from Printful catalog: ${error.message}`);
+                return new Error(error.message)
+            }
+            return data;
         }
-        return result;
+        catch (e) {
+            this.logger.error(`[medusa-plugin-printful]: Error fetching product from catalog: ${e.message}`);
+            this.logger.error(`[medusa-plugin-printful]: Stack Trace: ${e.stack}`);
+            return e
+        }
     }
+
+    async getVariant(variant_id: string | number): Promise<Variant | Error> {
+        try {
+            const { data, error }: GetProductVariantResponse = await this.printfulClient.get(`/v2/catalog-variants/${variant_id}`, {store_id: this.printfulStoreId});
+
+            if(error){
+                this.logger.error(`[medusa-plugin-printful]: Error product variant from Printful catalog: ${error.message}`);
+                return data
+            }
+            return data;
+        }
+        catch (e) {
+            this.logger.error(`[medusa-plugin-printful]: Error fetching product variant from catalog: ${e.message}`);
+            this.logger.error(`[medusa-plugin-printful]: Stack Trace: ${e.stack}`);
+        }
+    }
+
+
+    async getProductVariants(product_id: string | number): Promise<Variant[] | Error> {
+        try {
+            const { data, error }: GetProductVariantsResponse = await this.printfulClient.get(`/v2/catalog-products/${product_id}/variants`, {store_id: this.printfulStoreId});
+            if(error){
+                this.logger.error(`[medusa-plugin-printful]: Error fetching product variants from Printful catalog: ${error.message}`);
+                return new Error(error.message)
+            }
+            return data;
+        }
+        catch (e) {
+            this.logger.error(`[medusa-plugin-printful]: Error fetching product variants from catalog: ${e.message}`);
+            this.logger.error(`[medusa-plugin-printful]: Stack Trace: ${e.stack}`);
+            return e
+        }
+    }
+
+    async getProductSizeGuide(product_id: string | number, unit?: string): Promise<GetProductSizeGuideResponse | Error> {
+        try {
+            const response: GetProductSizeGuideResponse = await this.printfulClient.get(`/v2/catalog-products/${product_id}/sizes`)
+            if(response.error) {
+                this.logger.error(`[medusa-plugin-printful]: Error fetching product size guide from Printful catalog: ${response.error.message}`);
+                return new Error(response.error.message)
+            }
+            return response;
+        }
+        catch (e) {
+            this.logger.error(`[medusa-plugin-printful]: Error fetching product size guide from catalog: ${e.message}`);
+            this.logger.error(`[medusa-plugin-printful]: Stack Trace: ${e.stack}`);
+            return e
+        }
+    }
+
 }
 
 export default PrintfulCatalogService

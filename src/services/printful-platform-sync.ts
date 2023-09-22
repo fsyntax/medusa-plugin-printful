@@ -165,7 +165,7 @@ class PrintfulPlatformSyncService extends TransactionBaseService {
             const sync_product: PrintfulSyncProductProduct = syncResult.sync_product;
             const sync_variants: PrintfulSyncProductVariant[] = syncResult.sync_variants;
 
-            const catalogProductRes: PrintfulCatalogProductRes = await this.printfulCatalogService.getProduct(sync_variants[0].product.product_id);
+            const catalogProductRes: PrintfulCatalogProductRes = await this.printfulClient.get(`/products/${sync_variants[0].product.product_id}`);
             const { result: { product: catalog_product, variants: catalog_variants } } = catalogProductRes;
 
             this.logger.info(`[medusa-plugin-printful]: Syncing product ${printful_product_id}.`,);
