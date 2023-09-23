@@ -26,6 +26,9 @@
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
 - [Usage](#usage)
+- [Options](#options)
+  - [Configuration Options](#configuration-options)
+  - [Sample Configuration](#sample-configuration)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
@@ -93,7 +96,7 @@ Here are the options you can use to configure the plugin within your `medusa-con
 
 Here's how to set up your `medusa-config.js` file:
 
-```javascript
+```
 {
   resolve: "medusa-plugin-printful",
   options: {
@@ -108,7 +111,7 @@ Here's how to set up your `medusa-config.js` file:
     confirmOrder: false
   }
 }
-
+```
 
 ## Roadmap
 
