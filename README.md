@@ -1,134 +1,147 @@
-> **Hold on!** This plugin is still a work in progress and definetely has got some limitations or bugs. I recommend
-> testing it
-> thoroughly and only use it in a production environment if you're 100% confident it fulfills your needs. Please report
-> any issues you encounter to help me (and the community) improve the
-> plugin.
+<br/>
+<p align="center">
+  <a href="https://github.com/fsyntax/medusa-plugin-printful">
+    <img src="https://res.cloudinary.com/dekhvq1tl/image/upload/v1695462189/medusa-plugin-printful-logo_vjwavs.png" alt="Logo" width="80" height="80">
+  </a>
 
-# Introducing Medusa-Plugin-Printful
+<h3 align="center">medusa-plugin-printful</h3>
 
-Medusa-Plugin-Printful is a plugin for the Medusa e-commerce platform that integrates with the Printful fulfillment
-service. This plugin enables merchants to easily manage their Printful products and orders through the Medusa dashboard,
-simplifying their workflow and saving them time.
+  <p align="center">
+    A MedusaJS Plugin to integrate Printful.
+    <br/>
+    <br/>
+    <a href="https://github.com/fsyntax/medusa-plugin-printful/issues">Report Bug</a>
+    .
+    <a href="https://github.com/fsyntax/medusa-plugin-printful/issues">Request Feature</a>
+  </p>
 
-With Medusa-Plugin-Printful, you can sync your Printful products with Medusa and fulfill your Medusa orders using
-Printful. The plugin listens to Printful webhook events and automatically syncs the product information between Printful
-and Medusa, ensuring that your product information is always up-to-date. The fulfillment is handled fully automatically
-through webhooks and the plugin.
-> ### Note:
->Currently, the plugin only supports handling events coming from Printful to Medusa and not vice versa (**except of
-order canceling** - this is a work in progress and the full integration is coming soon). Please note that the
-> fulfillment flow has not been fully tested yet in a Medusa production environment. However, it has been tested locally
-> with the Printful webhook simulator multiple times.
+![Downloads](https://img.shields.io/npm/dt/medusa-plugin-printful) ![Contributors](https://img.shields.io/github/contributors/fsyntax/medusa-plugin-printful?color=dark-green) ![Issues](https://img.shields.io/github/issues/fsyntax/medusa-plugin-printful)
 
-## Requirements
 
-- Fully working Medusa server, with Redis and Postgres running (when running locally, you should proxy the server
-  through a service like ngrok to make it accessible for Printful webhooks).
+## Table Of Contents
+
+- [About the Project](#about-the-project)
+- [Built With](#built-with)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+- [Usage](#usage)
+- [Options](#options)
+  - [Configuration Options](#configuration-options)
+  - [Sample Configuration](#sample-configuration)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
+- [Authors](#authors)
+- [Acknowledgements](#acknowledgements)
+
+## About The Project
+
+
+### Caution
+**Important:** This plugin is currently under development and may contain bugs or limitations. We strongly recommend testing it thoroughly before deploying it in a production environment. Please report any issues to improve the plugin.
+
+**Medusa-Plugin-Printful** is a plugin for the Medusa e-commerce platform that integrates with the Printful fulfillment service. This plugin simplifies the management of Printful products and orders through the Medusa dashboard, streamlining workflows and saving time.
+
+### What The Plugin Does
+
+- Syncs product details between Printful and Medusa.
+- Automatically updates product information based on Printful webhook events.
+- Handles order fulfillment automatically via webhooks.
+
+**Note:** As of now, the plugin supports events from Printful to Medusa but not the reverse, except for order cancelation. This feature is a work in progress and already under development on the `refactor/services` branch! 
+
+## Built With
+
+- MedusaJS
+- Node.js
+- Typescript
+
+
+## Getting Started
+
+### Prerequisites
+
+- Fully working Medusa server with Redis and Postgres.
 - Printful Account and Store (ID)
 
-## Installation
+### Installation
 
-To install Medusa-Plugin-Printful, make sure you have Node.js installed, along with Yarn, and a properly set up Medusa
-server. You will also need a Printful account and store (for now, only one store can be assigned).
-Once you have met the requirements, follow these steps:
+1. Install the package in your Medusa Server root: `yarn add medusa-plugin-printful`
+2. Configure the plugin in `medusa-config.js`.
+3. Start your server and verify the plugin's functionality:
 
-1. In your Medusa Server root, run the following command: <br>
-   `yarn add medusa-plugin-printful`
-2. Next, configure the plugin in your medusa-config.js file as described in the Configuration section above.
-3. Start your Medusa server with `yarn start` and verify that the plugin is working correctly by testing its
-   functionality
-   thoroughly. Please keep in mind that the plugin is still a work in progress and may have some limitations or bugs.
 
-## Configuration
+## Usage
 
-To configure your Medusa server, simply add the following plguin configuration to your `medusa-config.js` file:
+For using this plugin, follow the installation steps and make sure to configure the plugin properly in `medusa-config.js`. Once the setup is done, the plugin will automatically handle syncing and order fulfillment as per the functionalities listed under "What The Plugin Does".
 
-```
-{
-    resolve: medusa-plugin-printful,
-    options: {
-        printfulAccessToken: process.env.PRINTFUL_ACCESS_TOKEN, 
-        storeId: process.env.PRINTFUL_STORE_ID, 
-        backendUrl: process.env.BACKEND_URL, 
-        enableWebhooks: true, 
-        enableSync: true,
-        batchSize: 3
-        productTags: true,
-        productCategories: true,
-        redisURL: REDIS_URL or process.env.REDIS_URL,
-        confirmOrder: true
-    }
-}
-```
+## Options
 
-### Options
+### Configuration Options
+
+Here are the options you can use to configure the plugin within your `medusa-config.js` file:
 
 - `printfulAccessToken`: Access token for the Printful API.
 - `storeId`: Store ID for Printful.
-- `backendUrl`: Base URL for the Medusa server (without trailing slash - i.e. `http://localhost:9000`
-  or `https://api.your-domain.com`).
+- `backendUrl`: Base URL for the Medusa server (without trailing slash).
 - `enableWebhooks`: Enable or disable Printful webhook listener.
-- `enableSync`: Enable or disable product synchronization between Printful and Medusa.
-- `batchSize`:  This value is used to define how many jobs are added to the queue at once
-- `productTags`: Enable or disable wether product tags should be created and updated in Medusa
-- `productCategories`: Enable or disable wether product the product category should be added and updated (non-existent
-  categories are going to be created) in Medusa.
-- `confirmOrder`: Enable or disable if the order should be confirmed straight away when sending it to Printful, or if the order should be sent as a draft (wich requires a manual confirmation in the Printful Dashboard). Defaults to `false`. 
+- `enableSync`: Enable or disable product synchronization between Printful and Medusa. (Note: will be deprecated in future versions)
+- `batchSize`: Number of jobs added to the queue at once for better load management. (Note: will be deprecated in future versions)
+- `productTags`: Enable or disable the creation and updating of product tags in Medusa.
+- `productCategories`: Enable or disable the creation and updating of product categories in Medusa.
+- `confirmOrder`: Enable or disable automatic order confirmation when sending it to Printful.
 
-Please ensure that the `.env` variables for `printfulAccessToken`, `storeId`, and `backendUrl` are set accordingly.
+### Sample Configuration
 
-## Enhancements and Updates
+Here's how to set up your `medusa-config.js` file:
 
-- The plugin now leverages BullMQ to handle synchronization jobs, ensuring efficient handling of multiple tasks.
-- It uses an exponential backoff algorithm to manage the retries of failed tasks. This strategy helps in reducing the
-  load on the server and improving the overall efficiency of tasks execution.
-- The option `batchSize` now determines the number of jobs that are added to the queue at once, giving you more control
-  over the load management.
+```
+{
+  resolve: "medusa-plugin-printful",
+  options: {
+    printfulAccessToken: process.env.PRINTFUL_ACCESS_TOKEN,
+    storeId: process.env.PRINTFUL_STORE_ID,
+    backendUrl: process.env.BACKEND_URL,
+    enableWebhooks: true,
+    enableSync: true,
+    batchSize: 3,
+    productTags: true,
+    productCategories: true,
+    confirmOrder: false
+  }
+}
+```
 
-### Custom Endpoints
+## Roadmap
 
-In addition to the default functionality, the plugin comes with a few custom endpoints that can be used to manually
-manage the integration:
+The upcoming roadmap includes several key features and improvements:
 
-- `/admin/printful/create_webhooks`: Manually create and enable the webhooks for Printful.
-- `/admin/printful/sync`: Start a full Printful product catalog synchronization manually.
-- `/admin/printful/create_regions`: Create all available regions from Printful in Medusa with the corresponding
-  countries. (**Attention: this will delete all existing regions in Medusa!**)
+### Short Term Goals
+- Refactoring services to use v2 of the Printful API - this will be a continuous process as the API is still in beta.
+- Biliteral product synchronization: Full two-way sync between Medusa and Printful platforms.
+- Admin UI Integration: A user-friendly dashboard interface for easy management of Printful products and orders within Medusa.
 
-Please note that the custom endpoints are not meant to be exposed to the public and should only be accessed by
-authenticated users.
+### Long Term Goals
+- Eventual More Features: As the plugin matures, more functionalities will be introduced based on community feedback and requirements.
 
-### What the plugin does
+Feel free to contribute by opening issues or pull requests to help achieve these milestones.
 
-- Syncs Printful products with Medusa. (this includes variants, images, and options)
-- Syncs Printful orders with Medusa.
-- Creates and enables webhooks for Printful.
-- Listens to Printful webhook events and automatically syncs product information & orders between Printful and Medusa.
-- Can create regions in Medusa based on the regions available in Printful.
-- Can create product tags and categories in Medusa based on the tags and categories available in Printful.
-- Uses the BullMQ job queue to manage synchronization tasks, improving reliability and efficiency.
 
-Overall, Medusa-Plugin-Printful simplifies the management of your e-commerce store by providing seamless integration
-with the Printful fulfillment service.
+## Contributing
 
-### What's Next
+Contributions are welcome. Please feel free to open pull requests or issues for enhancements or bug reports.
 
-Currently, Medusa-Plugin-Printful only supports handling events coming from Printful to Medusa, with the exception of
-order canceling. However, I'm actively working on implementing the full two-way sync feature, which will allow for
-seamless handling of products between both Medusa and Printful. This feature will enable merchants to manage their
-entire product catalog from either platform, making their workflow even more efficient. Stay tuned for updates on this
-exciting new feature!
+## License
 
-## Thanks
+MIT License.
 
-I would like to express my gratitude to the MedusaJS team for providing a powerful and flexible e-commerce platform that
-made it possible for me to create this plugin. I appreciate the hard work and dedication that went into developing and
-maintaining Medusa.
+## Authors
 
-**Thank you, MedusaJS team, for your contributions to the open-source community and for making e-commerce accessible to
-everyone!** 💜
+- [fsyntax](https://github.com/fsyntax)
 
-### Contributing
+## Acknowledgements
 
-If you want to contribute to this project, please feel free to open a pull request or an issue. I will try to respond as
-soon as possible!
+A big thank you to the MedusaJS team for creating a robust e-commerce platform that enabled the development of this plugin. Special thanks to those who have contributed to the project or provided valuable feedback.
+
+
