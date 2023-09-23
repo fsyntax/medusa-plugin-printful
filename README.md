@@ -73,6 +73,43 @@
 
 For using this plugin, follow the installation steps and make sure to configure the plugin properly in `medusa-config.js`. Once the setup is done, the plugin will automatically handle syncing and order fulfillment as per the functionalities listed under "What The Plugin Does".
 
+## Options
+
+### Configuration Options
+
+Here are the options you can use to configure the plugin within your `medusa-config.js` file:
+
+- `printfulAccessToken`: Access token for the Printful API.
+- `storeId`: Store ID for Printful.
+- `backendUrl`: Base URL for the Medusa server (without trailing slash).
+- `enableWebhooks`: Enable or disable Printful webhook listener.
+- `enableSync`: Enable or disable product synchronization between Printful and Medusa. (Note: will be deprecated in future versions)
+- `batchSize`: Number of jobs added to the queue at once for better load management. (Note: will be deprecated in future versions)
+- `productTags`: Enable or disable the creation and updating of product tags in Medusa.
+- `productCategories`: Enable or disable the creation and updating of product categories in Medusa.
+- `confirmOrder`: Enable or disable automatic order confirmation when sending it to Printful.
+
+### Sample Configuration
+
+Here's how to set up your `medusa-config.js` file:
+
+```javascript
+{
+  resolve: "medusa-plugin-printful",
+  options: {
+    printfulAccessToken: process.env.PRINTFUL_ACCESS_TOKEN,
+    storeId: process.env.PRINTFUL_STORE_ID,
+    backendUrl: process.env.BACKEND_URL,
+    enableWebhooks: true,
+    enableSync: true,
+    batchSize: 3,
+    productTags: true,
+    productCategories: true,
+    confirmOrder: false
+  }
+}
+
+
 ## Roadmap
 
 The upcoming roadmap includes several key features and improvements:
