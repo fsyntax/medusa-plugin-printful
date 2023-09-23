@@ -166,3 +166,11 @@ export interface OrderItem {
     variant_id: number;
     source: string;
 }
+
+export interface WebhookEventData {
+    type: string;
+    occurred_at: string;
+    retries: number;
+    store_id: number;
+    data: Record<string, any>;
+}
