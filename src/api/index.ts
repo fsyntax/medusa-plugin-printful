@@ -86,9 +86,14 @@ export default (rootDirectory, options) => {
     adminRouter.get('/admin/printful/sync_variant/:variant_id', cors(adminCorsOptions), async (req, res) => {
         const printfulPlatformSyncService = req.scope.resolve('printfulPlatformSyncService')
         const sync_variant = await printfulPlatformSyncService.getSyncVariant(req.params.variant_id)
-
         res.json(sync_variant)
+    })
 
+  adminRouter.options('/admin/printful/webhook/get', cors(adminCorsOptions))
+    adminRouter.get('/admin/printful/webhook/get', cors(adminCorsOptions), async (req, res) => {
+      const printfulWebhookService = req.scope.resolve('printfulWebhookService')
+      const config = await printfulWebhookService.getConfig()
+      res.json(config)
     })
 
   return [adminRouter, storeRouter]

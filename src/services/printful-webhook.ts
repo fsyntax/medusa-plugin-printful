@@ -17,6 +17,7 @@ class PrintfulWebhookService extends TransactionBaseService {
     private printfulClient: PrintfulClient;
     private storeId: string;
     private logger: Logger;
+    private eventTypes: string[];
 
     constructor(container, options) {
         super(container);
@@ -24,9 +25,23 @@ class PrintfulWebhookService extends TransactionBaseService {
         this.printfulClient = new PrintfulClient(options.printfulAccessToken);
         this.storeId = options.printfulStoreId;
         this.logger = container.logger;
-
+        this.eventTypes = [
+            "shipment_sent",
+            "shipment_returned",
+            "order_created",
+            "order_updated",
+            "order_failed",
+            "order_canceled",
+            "product_synced",
+            "product_updated",
+            "product_deleted",
+            "catalog_stock_updated",
+            "catalog_price_changed",
+            "order_put_hold",
+            "order_put_hold_approval",
+            "order_remove_hold"
+        ];
     }
-
 
     /**
      * Returns a configured webhook URL and a list of webhook event types enabled for the store
@@ -34,13 +49,13 @@ class PrintfulWebhookService extends TransactionBaseService {
      * */
     async getConfig(): Promise<GetWebhookConfigResponse | Error> {
         try {
-            const { result, error }: GetWebhookConfigResponse = await this.printfulClient.get('/v2/webhooks', { store_id: this.storeId });
-            if(error) {
-                this.logger.error(`[medusa-plugin-printful]: Error fetching Printful Webhook configurations : ${error.message}`);
-                return new Error(error.message);
+            const result: GetWebhookConfigResponse = await this.printfulClient.get('/v2/webhooks', { store_id: this.storeId });
+            if(result.error) {
+                this.logger.error(`[medusa-plugin-printful]: Error fetching Printful Webhook configurations : ${result.error.message}`);
+                return new Error(result.error.message);
             }
             this.logger.success('mpp-webhooks', '[medusa-plugin-printful]: Successfully fetched Printful Webhook configurations');
-            return { result }
+            return  result
         } catch (error) {
             this.logger.error(`[medusa-plugin-printful]: Error fetching Printful Webhook configurations : ${error.message}`);
             this.logger.error(`[medusa-plugin-printful]: Stack trace: ${error.stack}`);
@@ -98,6 +113,9 @@ class PrintfulWebhookService extends TransactionBaseService {
             this.logger.error(`[medusa-plugin-printful]: Stack trace: ${error.stack}`);
             return error;
         }
+    }
+    getEventType(): string[] {
+        return this.eventTypes;
     }
 }
 

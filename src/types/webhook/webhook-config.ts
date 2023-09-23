@@ -98,16 +98,18 @@ export interface EventConfiguration {
 
 export interface GetWebhookConfigResponse {
     code?: number;
-    result?: {
-        default_url: string | null;
-        expires_at: number | null;
-        events: EventConfiguration[];
-        public_key: string;
-    };
+    result?: GetWebhookConfigResponseResult;
     error?: {
         reason: string;
         message: string;
     };
+}
+
+export interface GetWebhookConfigResponseResult {
+    default_url: string | null;
+    expires_at: number | null;
+    events: EventConfiguration[];
+    public_key: string;
 }
 
 export interface SetWebhookEventRequestParam {
@@ -115,11 +117,28 @@ export interface SetWebhookEventRequestParam {
     value: { id: number }[];
 }
 
+type WebhookEventType =
+    | "shipment_sent"
+    | "shipment_returned"
+    | "order_created"
+    | "order_updated"
+    | "order_failed"
+    | "order_canceled"
+    | "product_synced"
+    | "product_updated"
+    | "product_deleted"
+    | "catalog_stock_updated"
+    | "catalog_price_changed"
+    | "order_put_hold"
+    | "order_put_hold_approval"
+    | "order_remove_hold";
+
 export interface SetWebhookEventRequest {
-    type: string;
+    type: WebhookEventType;
     url: string;
     params?: SetWebhookEventRequestParam[];
 }
+
 
 export interface SetWebhookEventResponse {
     code?: number;
