@@ -90,7 +90,7 @@ class PrintfulWebhookService extends TransactionBaseService {
      * @returns CreateWebhookConfigResponse
      *
      */
-    async setup(payload: CreateWebhookConfigRequest): Promise<CreateWebhookConfigResponse | Error> {
+    async setConfig(payload: CreateWebhookConfigRequest): Promise<CreateWebhookConfigResponse | Error> {
         try {
             const { result, error }: CreateWebhookConfigResponse = await this.printfulClient.post('/v2/webhooks', {
                 store_id: this.storeId, ...payload

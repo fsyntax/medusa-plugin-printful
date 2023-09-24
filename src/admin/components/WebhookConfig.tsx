@@ -24,10 +24,31 @@ const events = [
 
 export const WebhookConfigForm = () => {
 
+    const { mutate: setWebhookConfig, isLoading: isWebhookConfigLoading, isSuccess: isWebhookConfigSuccess } = useAdminCustomPost(
+        `printful/webhook/set`,
+        [`printful/webhook/set`],
+    );
+
     const handleSubmit = (e) => {
         e.preventDefault();
-        // Handle form submission logic here
-        // You can now use eventSwitches to see which events are enabled
+        const data = new FormData(e.target);
+        const payload = {
+            default_url: data.get('default_url'),
+            public_key: data.get('public_key'),
+         };
+
+        if(data.get('expires_at')) {
+            payload['expires_at'] = data.get('expires_at');
+        }
+
+        return setWebhookConfig(payload, {
+            onSuccess: (data) => {
+                console.log(data);
+            },
+            onError: (error) => {
+                console.log(error);
+            }
+        })
     };
 
     return (
