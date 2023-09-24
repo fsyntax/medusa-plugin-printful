@@ -22,7 +22,7 @@ const events = [
 ];
 
 
-export const WebhookConfigForm = () => {
+export const WebhookConfigForm = ({notify}) => {
 
     const { mutate: setWebhookConfig, isLoading: isWebhookConfigLoading, isSuccess: isWebhookConfigSuccess } = useAdminCustomPost(
         `printful/webhook/set`,
@@ -43,10 +43,12 @@ export const WebhookConfigForm = () => {
 
         return setWebhookConfig(payload, {
             onSuccess: (data) => {
-                console.log(data);
+                console.log(data)
+                notify.success("Success", "Webhook configuration updated");
             },
             onError: (error) => {
-                console.log(error);
+                console.error(error)
+                notify.error("Error", error.message ?? "Something went wrong")
             }
         })
     };
@@ -59,22 +61,22 @@ export const WebhookConfigForm = () => {
             </Text>
                 <form onSubmit={handleSubmit}>
                     <div className="flex flex-col gap-y-1 mb-2">
-                        <Label htmlFor="default_url" className="font-bold text-ui-fg-subtle">
+                        <Label htmlFor="default_url"  className="font-bold text-ui-fg-subtle">
                             Default URL
                         </Label>
-                        <Input id="default_url" placeholder="https://example.com/webhook" />
+                        <Input id="default_url" name="default_url" placeholder="https://example.com/webhook" />
                     </div>
                     <div className="flex flex-col gap-y-1 mb-2">
                         <Label htmlFor="public_key" className="font-bold text-ui-fg-subtle">
                             Public Key
                         </Label>
-                        <Input id="public_key" placeholder="YOURPUBLICKEY" />
+                        <Input id="public_key" name="public_key" placeholder="YOURPUBLICKEY" />
                     </div>
                     <div className="flex flex-col gap-y-1 mb-2">
                         <Label htmlFor="expires_at" className="font-bold text-ui-fg-subtle">
                             Expires At
                         </Label>
-                        <Input id="expires_at" placeholder="Unix Timestamp" />
+                        <Input id="expires_at" name="expires_at" placeholder="Unix Timestamp" />
                     </div>
                     <Button variant="secondary" type="submit">Save Configuration</Button>
                 </form>
@@ -87,6 +89,7 @@ export const WebhookConfigForm = () => {
 const WebhookContainer = ({notify}) => {
     const [loadingEvent, setLoadingEvent] = useState<string | null>(null);
     const [isDefaultUrlSet, setIsDefaultUrlSet] = useState(false);
+    const [eventUrls, setEventUrls] = useState({});
 
     const { data, isLoading } = useAdminCustomQuery(
         "printful/webhook/get",
@@ -96,6 +99,20 @@ const WebhookContainer = ({notify}) => {
             refetchOnWindowFocus: false,
         }
     );
+
+    useEffect(() => {
+        if (data?.data?.events?.length) {
+            const newEventUrls = {};
+            const newEventSwitches = {};
+            data.data.events.forEach(event => {
+                newEventUrls[event.type] = event.url;
+                newEventSwitches[event.type] = true; // Assuming the event is enabled if it exists
+            });
+            setEventUrls(newEventUrls);
+            setEventSwitches(prevState => ({ ...prevState, ...newEventSwitches }));
+        }
+    }, [data]);
+
 
     useEffect(() => {
         if(data?.data?.default_url) {
@@ -112,31 +129,42 @@ const WebhookContainer = ({notify}) => {
         [`printful/webhook/set_event`],
     );
 
-    const handleButtonClick = async (event) => {
+    const { mutate: disableEventMutate, isLoading: disableEventIsLoading } = useAdminCustomPost(
+        `printful/webhook/disable_event`,
+        ['printful/webhook/disable_event']
+    )
+
+    const handleButtonClick = async (event, type: "set" | "disable") => {
         const id = event.target.id;
         setLoadingEvent(id);
-        // Prepare the payload or query parameters
-        const payload: SetWebhookEventRequest = {
-            type: id,
-            url: data?.data?.default_url ?? 'http://localhost:9000/printful/webhook',
-            params: []
-        };
 
-       return mutate(payload, {
+        const commonCallbacks = {
             onSuccess: (data) => {
-                    setEventSwitches((prevState) => ({
-                        ...prevState,
-                        [id]: !prevState[id],
-                    }));
-                    notify("Success", "Event configuration updated");
+                setEventSwitches((prevState) => ({
+                    ...prevState,
+                    [id]: !prevState[id],
+                }));
+                notify.success("Success", "Event configuration updated");
                 setLoadingEvent(null);
             },
             onError: (error) => {
                 notify.error("Error", error.message ?? "Something went wrong");
                 setLoadingEvent(null);
             }
-       })
+        };
+
+        if (type === 'set') {
+            const payload: SetWebhookEventRequest = {
+                type: id,
+                url: data?.data?.default_url ?? 'http://localhost:9000/printful/webhook',
+                params: []
+            };
+            return mutate(payload, commonCallbacks);
+        } else if (type === "disable") {
+            return disableEventMutate({ eventType: id }, commonCallbacks);
+        }
     };
+
 
 
 
@@ -197,7 +225,7 @@ const WebhookContainer = ({notify}) => {
                                 <Button>Save</Button>
                             </FocusModal.Header>
                             <FocusModal.Body className="flex gap-20 p-16">
-                                <WebhookConfigForm />
+                                <WebhookConfigForm notify={notify}/>
                                 <div className="flex flex-1 flex-col gap-5 relative">
                                     <div style={{ backdropFilter: 'blur(2px)' }}  className={isDefaultUrlSet ? 'hidden' : 'absolute z-50 -inset-1 bg-white bg-opacity-60 text-center flex items-center justify-center'}>
                                         <Text className="font-bold text-xl">Please set a general configuration first. 👀</Text>
@@ -205,25 +233,24 @@ const WebhookContainer = ({notify}) => {
                                     <Heading level="h3" className="mb-3">Event Configuration</Heading>
                                     <Text className="text-ui-fg-subtle">Click the buttons below to either enable or disable the different webhook event types.</Text>
                                     <div className="flex flex-col gap-1.5">
-                                        {events.map((event, index) => (
+                                        {events.map((eventType, index) => (
                                             <div className="flex items-center gap-x-2" key={index}>
-                                                {loadingEvent === event ? (
+                                                {loadingEvent === eventType ? (
                                                     <EllipseOrangeSolid />
                                                 ) : (
                                                     <div>
-                                                        {eventSwitches[event] ? <EllipseGreenSolid /> : <EllipseRedSolid />}
+                                                        {eventSwitches[eventType] ? <EllipseGreenSolid /> : <EllipseRedSolid />}
                                                     </div>
                                                 )}
 
-                                                <Label htmlFor={event}>{event}</Label>
+                                                <Label htmlFor={eventType}>{eventType}</Label>
                                                 <Button
-                                                    id={event}
+                                                    id={eventType}
                                                     variant="secondary"
-                                                    onClick={handleButtonClick}
-                                                    isLoading={loadingEvent === event}
-                                                    disabled={!isDefaultUrlSet}
+                                                    onClick={(e) => handleButtonClick(e, eventSwitches[eventType] ? "disable" : "set")}                                                    isLoading={loadingEvent === eventType}
+                                                    disabled={loadingEvent !== null}
                                                 >
-                                                    {eventSwitches[event] ? "Disable" : "Enable"}
+                                                    {eventSwitches[eventType] ? "Disable" : "Enable"}
                                                 </Button>
                                             </div>
                                         ))}

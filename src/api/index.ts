@@ -90,11 +90,15 @@ export default (rootDirectory, options) => {
     })
 
   adminRouter.options('/admin/printful/webhook/set', cors(adminCorsOptions))
-  adminRouter.get('/admin/printful/webhook/set', cors(adminCorsOptions), async (req, res) => {
+  adminRouter.post('/admin/printful/webhook/set', cors(adminCorsOptions), async (req, res) => {
     const printfulWebhookService = req.scope.resolve('printfulWebhookService')
-
+    console.log(req)
     try {
-        const result = await printfulWebhookService.setConfig(req.query as any);
+        const { default_url, public_key } = req.body
+        const result = await printfulWebhookService.setConfig({default_url, public_key});
+        if(result.error) {
+          res.status(400).json({ error: result });
+        }
         res.json(result);
     }
     catch (error) {
@@ -113,7 +117,7 @@ export default (rootDirectory, options) => {
   adminRouter.options('/admin/printful/webhook/set_event', cors(adminCorsOptions))
   adminRouter.post('/admin/printful/webhook/set_event', cors(adminCorsOptions), async (req, res) => {
     const printfulWebhookService = req.scope.resolve('printfulWebhookService')
-    const { type, url, params } = req.query as any
+    const { type, url, params } = req.body as any
 
     try {
       const result = await printfulWebhookService.setEvent(type, { url, params });
@@ -121,6 +125,19 @@ export default (rootDirectory, options) => {
     } catch (error) {
       console.error(error);
       res.status(400).json({ error: error.data });
+    }
+  });
+
+  adminRouter.options('/admin/printful/webhook/disable_event', cors(adminCorsOptions))
+  adminRouter.post('/admin/printful/webhook/disable_event', cors(adminCorsOptions), async (req, res) => {
+    const printfulWebhookService = req.scope.resolve('printfulWebhookService')
+    try {
+        const result = await printfulWebhookService.disableEvent(req.body.eventType);
+      res.status(204).end();
+    }
+    catch (e) {
+        console.error(e);
+        res.status(400).json({ error: e.data });
     }
   });
 
@@ -143,7 +160,7 @@ export default (rootDirectory, options) => {
     const incomingSignature = req.headers['x-printful-signature'];
 
     // Printful secret key
-    const secretKey = 'your_secret_key_here';
+    const secretKey = 'supersecret';
 console.log(rawBody, incomingSignature, secretKey)
     return res.json({rawBody, incomingSignature, secretKey})
     // Verify the signature

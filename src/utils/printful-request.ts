@@ -70,6 +70,10 @@ export class PrintfulClient {
 
         const response = await fetch(url, requestConfig);
 
+        if (response.status === 204) {
+            return null;
+        }
+
         const json = await response.json();
 
         if (!response.ok) {
