@@ -23,7 +23,7 @@ class PrintfulWebhookService extends TransactionBaseService {
         super(container);
 
         this.printfulClient = new PrintfulClient(options.printfulAccessToken);
-        this.storeId = options.printfulStoreId;
+        this.storeId = options.storeId;
         this.logger = container.logger;
         this.eventTypes = [
             "shipment_sent",
@@ -49,7 +49,7 @@ class PrintfulWebhookService extends TransactionBaseService {
      * */
     async getConfig(): Promise<GetWebhookConfigResponse | Error> {
         try {
-            const result: GetWebhookConfigResponse = await this.printfulClient.get('/v2/webhooks', { store_id: this.storeId });
+            const result: GetWebhookConfigResponse = await this.printfulClient.get('/v2/webhooks', { store_id: this.storeId } );
             if(result.error) {
                 this.logger.error(`[medusa-plugin-printful]: Error fetching Printful Webhook configurations : ${result.error.message}`);
                 return new Error(result.error.message);
@@ -98,24 +98,38 @@ class PrintfulWebhookService extends TransactionBaseService {
      * @param eventType
      * @param payload
      */
-    async setEvent(eventType: string, payload: Omit<SetWebhookEventRequest, 'type'>): Promise<SetWebhookEventResponse | Error>{        try {
-            const { result, error }: SetWebhookEventResponse = await this.printfulClient.post(`/v2/webhooks/${eventType}`, {
+    async setEvent(eventType: string, payload: Omit<SetWebhookEventRequest, 'type'>): Promise<SetWebhookEventResponse> {
+        try {
+            const { result }: SetWebhookEventResponse = await this.printfulClient.post(`/v2/webhooks/${eventType}`, {
                 store_id: this.storeId, ...payload
             });
-            if(error) {
-                this.logger.error(`[medusa-plugin-printful]: Error trying to set up Printful Webhook configurations : ${error.message}`);
-                return new Error(error.message);
-            }
             this.logger.success('mpp-webhooks', '[medusa-plugin-printful]: Successfully set up Printful Webhook configurations');
-            return { result }
+            return { result };
         } catch (error) {
-            this.logger.error(`[medusa-plugin-printful]: Error trying to set up Printful Webhook configurations : ${error.message}`);
-            this.logger.error(`[medusa-plugin-printful]: Stack trace: ${error.stack}`);
-            return error;
+            this.logger.error(`[medusa-plugin-printful]: Error trying to set up Printful Webhook configurations : ${error.data}`);
+            throw error;
         }
     }
 
-    async getEventConfig()
+    // async setEvent(eventType: string, payload: Omit<SetWebhookEventRequest, 'type'>): Promise<SetWebhookEventResponse> {
+    //     try {
+    //         const { result, error }: SetWebhookEventResponse = await this.printfulClient.post(`/v2/webhooks/${eventType}`, {
+    //             store_id: this.storeId, ...payload
+    //         });
+    //         if (error) {
+    //             this.logger.error(`[medusa-plugin-printful]: Error trying to set up Printful Webhook configurations : ${error.message}`);
+    //             throw new Error(error.message);
+    //         }
+    //         this.logger.success('mpp-webhooks', '[medusa-plugin-printful]: Successfully set up Printful Webhook configurations');
+    //         return { result };
+    //     } catch (error) {
+    //         this.logger.error(`[medusa-plugin-printful]: Error trying to set up Printful Webhook configurations : ${error.message}`);
+    //         this.logger.error(`[medusa-plugin-printful]: Stack trace: ${error.stack}`);
+    //         throw error;
+    //     }
+    // }
+
+
 
     getEventType(): string[] {
         return this.eventTypes;

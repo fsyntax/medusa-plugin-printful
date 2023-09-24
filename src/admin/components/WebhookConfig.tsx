@@ -2,6 +2,7 @@ import { Container, Heading, Text, Table, Label, Input, Button, FocusModal, Swit
 import {EllipseGreenSolid, EllipseOrangeSolid, EllipseRedSolid} from "@medusajs/icons";
 import React, {useState} from "react";
 import {MedusaProvider, useAdminCustomPost, useAdminCustomQuery} from "medusa-react";
+import {SetWebhookEventRequest, WebhookEventResponse} from "../../types/webhook/webhook-config";
 
 const events = [
     "shipment_sent",
@@ -62,7 +63,9 @@ export const WebhookConfigForm = () => {
 
 
 
-const WebhookContainer = () => {
+const WebhookContainer = ({notify}) => {
+    const [loadingEvent, setLoadingEvent] = useState<string | null>(null);
+
     const { data, isLoading } = useAdminCustomQuery(
         "printful/webhook/get",
         ["printful/webhook/get"],
@@ -76,28 +79,37 @@ const WebhookContainer = () => {
         events.reduce((acc, curr) => ({ ...acc, [curr]: false }), {})
     );
 
-    const { mutate, isLoading: setEventIsLoading } = useAdminCustomPost(
+    const { mutate, isLoading: eventIsLading, isSuccess } = useAdminCustomPost(
         `printful/webhook/set_event`,
         [`printful/webhook/set_event`],
     );
 
     const handleButtonClick = async (event) => {
         const id = event.target.id;
-        setEventSwitches({ ...eventSwitches, [id]: !eventSwitches[id] });
-
+        setLoadingEvent(id);
         // Prepare the payload or query parameters
-        const payload = {
-            event_type: id,
-            enabled: !eventSwitches[id] // Toggle the current state
+        const payload: SetWebhookEventRequest = {
+            type: id,
+            url: data?.data?.default_url ?? 'http://localhost:9000/printful/webhook',
+            params: []
         };
 
-        try {
-            // Call the API to set the event
-            await mutate(payload);
-        } catch (error) {
-            console.error("Failed to set event:", error);
-        }
+       return mutate(payload, {
+            onSuccess: (data) => {
+                    setEventSwitches((prevState) => ({
+                        ...prevState,
+                        [id]: !prevState[id],
+                    }));
+                    notify("Success", "Event configuration updated");
+                setLoadingEvent(null);
+            },
+            onError: (error) => {
+                notify.error("Error", error.message ?? "Something went wrong");
+                setLoadingEvent(null);
+            }
+       })
     };
+
 
 
     return (
@@ -164,12 +176,20 @@ const WebhookContainer = () => {
                                     <div className="flex flex-col gap-1.5">
                                         {events.map((event, index) => (
                                             <div className="flex items-center gap-x-2" key={index}>
-                                                {eventSwitches[event] ? <EllipseGreenSolid /> : <EllipseRedSolid />}
+                                                {loadingEvent === event ? (
+                                                    <EllipseOrangeSolid />
+                                                ) : (
+                                                    <div>
+                                                        {eventSwitches[event] ? <EllipseGreenSolid /> : <EllipseRedSolid />}
+                                                    </div>
+                                                )}
+
                                                 <Label htmlFor={event}>{event}</Label>
                                                 <Button
                                                     id={event}
                                                     variant="secondary"
                                                     onClick={handleButtonClick}
+                                                    isLoading={loadingEvent === event}
                                                 >
                                                     {eventSwitches[event] ? "Disable" : "Enable"}
                                                 </Button>

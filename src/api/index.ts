@@ -97,12 +97,19 @@ export default (rootDirectory, options) => {
     })
 
   adminRouter.options('/admin/printful/webhook/set_event', cors(adminCorsOptions))
-  adminRouter.get('/admin/printful/webhook/set_event', cors(adminCorsOptions), async (req, res) => {
+  adminRouter.post('/admin/printful/webhook/set_event', cors(adminCorsOptions), async (req, res) => {
     const printfulWebhookService = req.scope.resolve('printfulWebhookService')
-    const query = req.query as any
-    console.log(query)
-    res.json(query)
-  })
+    const { type, url, params } = req.query as any
+
+    try {
+      const result = await printfulWebhookService.setEvent(type, { url, params });
+      res.json(result);
+    } catch (error) {
+      console.error(error);
+      res.status(400).json({ error: 'An error occurred while setting the event.' });
+    }
+  });
+
 
   adminRouter.options('/admin/printful/webhook/get_events', cors(adminCorsOptions))
   adminRouter.get('/admin/printful/webhook/get_events', cors(adminCorsOptions), async (req, res) => {

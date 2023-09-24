@@ -45,7 +45,7 @@ export interface CreateWebhookEventRequest {
 }
 
 export interface WebhookEventResponse {
-    code: number;
+    code?: number;
     data?: {
         type: string;
         url: string | null;

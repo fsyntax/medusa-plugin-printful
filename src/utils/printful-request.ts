@@ -51,9 +51,12 @@ export class PrintfulClient {
 
 
 
-    async request({ method, endpoint, data = {}, params = {}, customHeaders = {} }: RequestOptions) {
+    async request({ method, endpoint, data = {}, params = {}, customHeaders }: RequestOptions) {
         const { baseUrl } = this.options;
         const queryString = this.buildQueryString(params);
+        if(!customHeaders) {
+            customHeaders = {}
+        }
         const url = `${baseUrl}${endpoint}${queryString}`;
 
         const requestConfig: any = {
