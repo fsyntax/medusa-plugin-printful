@@ -1,6 +1,6 @@
 import { Container, Heading, Text, Table, Label, Input, Button, FocusModal, Switch } from "@medusajs/ui";
 import {EllipseGreenSolid, EllipseOrangeSolid, EllipseRedSolid} from "@medusajs/icons";
-import React, {useState} from "react";
+import React, {useEffect, useState} from "react";
 import {MedusaProvider, useAdminCustomPost, useAdminCustomQuery} from "medusa-react";
 import {SetWebhookEventRequest, WebhookEventResponse} from "../../types/webhook/webhook-config";
 
@@ -65,6 +65,7 @@ export const WebhookConfigForm = () => {
 
 const WebhookContainer = ({notify}) => {
     const [loadingEvent, setLoadingEvent] = useState<string | null>(null);
+    const [isDefaultUrlSet, setIsDefaultUrlSet] = useState(false);
 
     const { data, isLoading } = useAdminCustomQuery(
         "printful/webhook/get",
@@ -74,6 +75,12 @@ const WebhookContainer = ({notify}) => {
             refetchOnWindowFocus: false,
         }
     );
+
+    useEffect(() => {
+        if(data?.data?.default_url) {
+            setIsDefaultUrlSet(true);
+        }
+    }, [data]);
 
     const [eventSwitches, setEventSwitches] = useState(
         events.reduce((acc, curr) => ({ ...acc, [curr]: false }), {})
@@ -170,7 +177,10 @@ const WebhookContainer = ({notify}) => {
                             </FocusModal.Header>
                             <FocusModal.Body className="flex gap-20 p-16">
                                 <WebhookConfigForm />
-                                <div className="flex flex-1 flex-col gap-5">
+                                <div className="flex flex-1 flex-col gap-5 relative">
+                                    <div style={{ backdropFilter: 'blur(2px)' }}  className={isDefaultUrlSet ? 'hidden' : 'absolute z-50 -inset-1 bg-white bg-opacity-60 text-center flex items-center justify-center'}>
+                                        <Text className="font-bold text-xl">Please set a general configuration first. 👀</Text>
+                                    </div>
                                     <Heading level="h3" className="mb-3">Event Configuration</Heading>
                                     <Text className="text-ui-fg-subtle">Click the buttons below to either enable or disable the different webhook event types.</Text>
                                     <div className="flex flex-col gap-1.5">
@@ -190,6 +200,7 @@ const WebhookContainer = ({notify}) => {
                                                     variant="secondary"
                                                     onClick={handleButtonClick}
                                                     isLoading={loadingEvent === event}
+                                                    disabled={!isDefaultUrlSet}
                                                 >
                                                     {eventSwitches[event] ? "Disable" : "Enable"}
                                                 </Button>

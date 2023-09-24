@@ -106,7 +106,7 @@ export default (rootDirectory, options) => {
       res.json(result);
     } catch (error) {
       console.error(error);
-      res.status(400).json({ error: 'An error occurred while setting the event.' });
+      res.status(400).json({ error: error.data });
     }
   });
 
