@@ -5,6 +5,7 @@ import {
     CreateWebhookConfigResponse,
     GetWebhookConfigResponse, SetWebhookEventRequest, SetWebhookEventResponse
 } from "../types/webhook/webhook-config";
+import crypto from 'crypto'
 
 /**
  * PrintfulWebhookService is responsible for handling Webhooks from Printful.
@@ -61,6 +62,22 @@ class PrintfulWebhookService extends TransactionBaseService {
             this.logger.error(`[medusa-plugin-printful]: Stack trace: ${error.stack}`);
             return error;
         }
+    }
+
+    /**
+     * Verifies the HMAC signature for the incoming webhook request.
+     * @param {string} rawBody - The raw request body as a string.
+     * @param {string} incomingSignature - The 'X-Printful-Signature' header from the request.
+     * @param {string} secretKey - Your Printful secret key.
+     * @returns {boolean} - Returns true if the signature is valid, otherwise false.
+     */
+    verifySignature(rawBody: string, incomingSignature: string, secretKey: string): boolean {
+        const hash = crypto
+            .createHmac('sha256', secretKey)
+            .update(rawBody)
+            .digest('hex');
+
+        return hash === incomingSignature;
     }
 
     /**

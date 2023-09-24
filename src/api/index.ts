@@ -119,5 +119,27 @@ export default (rootDirectory, options) => {
     res.json(query)
   })
 
+  adminRouter.options('/admin/printful/webhook/events', cors(adminCorsOptions))
+  adminRouter.post('/admin/printful/webhook/events', cors(adminCorsOptions), async (req, res) => {
+    const printfulWebhookService = req.scope.resolve('printfulWebhookService')
+
+    console.log(req)
+    // Capture the raw body and the signature from the headers
+    const rawBody = req.rawBody; // Make sure you capture this before any middleware
+    const incomingSignature = req.headers['x-printful-signature'];
+
+    // Printful secret key
+    const secretKey = 'your_secret_key_here';
+console.log(rawBody, incomingSignature, secretKey)
+    return res.json({rawBody, incomingSignature, secretKey})
+    // Verify the signature
+    if (printfulWebhookService.verifySignature(rawBody, incomingSignature, secretKey)) {
+      // Signature is valid, process the webhook event
+    } else {
+      // Invalid signature, ignore the event
+      return res.status(401).send('Invalid signature');
+    }
+  });
+
   return [adminRouter, storeRouter]
 }
