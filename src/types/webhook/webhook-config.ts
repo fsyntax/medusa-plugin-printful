@@ -63,7 +63,7 @@ export interface WebhookEventResponse {
 export interface GetEventConfigRequest {
     eventType: string;
     show_expired?: boolean;
-    'X-PF-Store-Id'?: string;
+    store_id: string;
 }
 
 export interface GetEventConfigResponse {

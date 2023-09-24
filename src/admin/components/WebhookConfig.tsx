@@ -1,7 +1,7 @@
 import { Container, Heading, Text, Table, Label, Input, Button, FocusModal, Switch } from "@medusajs/ui";
 import {EllipseGreenSolid, EllipseOrangeSolid, EllipseRedSolid} from "@medusajs/icons";
 import React, {useState} from "react";
-import { MedusaProvider, useAdminCustomQuery } from "medusa-react";
+import {MedusaProvider, useAdminCustomPost, useAdminCustomQuery} from "medusa-react";
 
 const events = [
     "shipment_sent",
@@ -76,10 +76,29 @@ const WebhookContainer = () => {
         events.reduce((acc, curr) => ({ ...acc, [curr]: false }), {})
     );
 
-    const handleButtonClick = (event) => {
+    const { mutate, isLoading: setEventIsLoading } = useAdminCustomPost(
+        `printful/webhook/set_event`,
+        [`printful/webhook/set_event`],
+    );
+
+    const handleButtonClick = async (event) => {
         const id = event.target.id;
         setEventSwitches({ ...eventSwitches, [id]: !eventSwitches[id] });
+
+        // Prepare the payload or query parameters
+        const payload = {
+            event_type: id,
+            enabled: !eventSwitches[id] // Toggle the current state
+        };
+
+        try {
+            // Call the API to set the event
+            await mutate(payload);
+        } catch (error) {
+            console.error("Failed to set event:", error);
+        }
     };
+
 
     return (
         <Container>
@@ -145,6 +164,8 @@ const WebhookContainer = () => {
                                     <div className="flex flex-col gap-1.5">
                                         {events.map((event, index) => (
                                             <div className="flex items-center gap-x-2" key={index}>
+                                                {eventSwitches[event] ? <EllipseGreenSolid /> : <EllipseRedSolid />}
+                                                <Label htmlFor={event}>{event}</Label>
                                                 <Button
                                                     id={event}
                                                     variant="secondary"
@@ -152,8 +173,6 @@ const WebhookContainer = () => {
                                                 >
                                                     {eventSwitches[event] ? "Disable" : "Enable"}
                                                 </Button>
-                                                {eventSwitches[event] ? <EllipseGreenSolid /> : <EllipseRedSolid />}
-                                                <Label htmlFor={event}>{event}</Label>
                                             </div>
                                         ))}
                                     </div>

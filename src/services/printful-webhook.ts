@@ -114,6 +114,9 @@ class PrintfulWebhookService extends TransactionBaseService {
             return error;
         }
     }
+
+    async getEventConfig()
+
     getEventType(): string[] {
         return this.eventTypes;
     }
