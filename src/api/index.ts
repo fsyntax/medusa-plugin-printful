@@ -89,6 +89,20 @@ export default (rootDirectory, options) => {
         res.json(sync_variant)
     })
 
+  adminRouter.options('/admin/printful/webhook/set', cors(adminCorsOptions))
+  adminRouter.get('/admin/printful/webhook/set', cors(adminCorsOptions), async (req, res) => {
+    const printfulWebhookService = req.scope.resolve('printfulWebhookService')
+
+    try {
+        const result = await printfulWebhookService.setConfig(req.query as any);
+        res.json(result);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(400).json({ error: error.data });
+    }
+  })
+
   adminRouter.options('/admin/printful/webhook/get', cors(adminCorsOptions))
     adminRouter.get('/admin/printful/webhook/get', cors(adminCorsOptions), async (req, res) => {
       const printfulWebhookService = req.scope.resolve('printfulWebhookService')
