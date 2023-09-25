@@ -34,7 +34,6 @@ export const WebhookConfigForm = ({notify}) => {
         const data = new FormData(e.target);
         const payload = {
             default_url: data.get('default_url'),
-            public_key: data.get('public_key'),
          };
 
         if(data.get('expires_at')) {
@@ -65,12 +64,6 @@ export const WebhookConfigForm = ({notify}) => {
                             Default URL
                         </Label>
                         <Input id="default_url" name="default_url" placeholder="https://example.com/webhook" />
-                    </div>
-                    <div className="flex flex-col gap-y-1 mb-2">
-                        <Label htmlFor="public_key" className="font-bold text-ui-fg-subtle">
-                            Public Key
-                        </Label>
-                        <Input id="public_key" name="public_key" placeholder="YOURPUBLICKEY" />
                     </div>
                     <div className="flex flex-col gap-y-1 mb-2">
                         <Label htmlFor="expires_at" className="font-bold text-ui-fg-subtle">
@@ -179,6 +172,9 @@ const WebhookContainer = ({notify}) => {
                 <div>
                     <Text>
                         <strong>Default URL:</strong> {data?.data?.default_url || "Not set"}
+                    </Text>
+                    <Text>
+                        <strong>Public Key:</strong> {data?.data?.public_key || "Not set"}
                     </Text>
                     <Text>
                         <strong>Expires At:</strong> {data?.data?.expires_at || "Not set"}

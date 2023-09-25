@@ -19,6 +19,7 @@ class PrintfulWebhookService extends TransactionBaseService {
     private storeId: string;
     private logger: Logger;
     private eventTypes: string[];
+    private defaultWebhookUrl: string;
 
     constructor(container, options) {
         super(container);
@@ -26,6 +27,7 @@ class PrintfulWebhookService extends TransactionBaseService {
         this.printfulClient = new PrintfulClient(options.printfulAccessToken);
         this.storeId = options.storeId;
         this.logger = container.logger;
+        this.defaultWebhookUrl = `${options.defaultWebhookUrl}/printful/webhook/events`
         this.eventTypes = [
             "shipment_sent",
             "shipment_returned",
@@ -88,13 +90,19 @@ class PrintfulWebhookService extends TransactionBaseService {
      */
     async setConfig(payload: CreateWebhookConfigRequest): Promise<CreateWebhookConfigResponse | Error> {
         try {
-            //TODO: replace url properly
-            payload.events = this.eventTypes.map((type) => ({ type, url: 'http://localhost:9000' }));
+
+            const { default_url, events, public_key, expires_at = null }: CreateWebhookConfigRequest = payload;
+
+            payload.events = this.eventTypes.map((type) => ({ type, url: default_url ?? this.defaultWebhookUrl }));
 
             const result: CreateWebhookConfigResponse = await this.printfulClient.post('/v2/webhooks', {
                 store_id: this.storeId,
-                ...payload
+                default_url: default_url ?? this.defaultWebhookUrl,
+                events: payload.events,
+                public_key,
+                expires_at
             });
+
             this.logger.success('mpp-webhooks', '[medusa-plugin-printful]: Successfully set up Printful Webhook configurations');
             return result
         } catch (error) {
