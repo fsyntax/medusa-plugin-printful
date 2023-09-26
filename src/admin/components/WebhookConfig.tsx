@@ -244,7 +244,7 @@ const WebhookContainer = ({notify}) => {
                                                     id={eventType}
                                                     variant="secondary"
                                                     onClick={(e) => handleButtonClick(e, eventSwitches[eventType] ? "disable" : "set")}                                                    isLoading={loadingEvent === eventType}
-                                                    disabled={loadingEvent !== null}
+                                                    disabled={loadingEvent !== null || eventType === "catalog_stock_updated"}
                                                 >
                                                     {eventSwitches[eventType] ? "Disable" : "Enable"}
                                                 </Button>

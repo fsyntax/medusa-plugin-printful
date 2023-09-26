@@ -8,6 +8,7 @@ const AppDataSource = new DataSource({
     database: "medusa-db-wsfmx",
     entities: [
         "dist/models/printful-webhook-config.js",
+        "dist/models/printful-webhook-events.js",
     ],
     migrations: [
         "dist/migrations/*.js",

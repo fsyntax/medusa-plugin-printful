@@ -1,6 +1,6 @@
 export interface CreateWebhookConfigResponse {
     code?: number;
-    result?: {
+    data?: {
         default_url: string | null;
         expires_at: number | null;
         events: {

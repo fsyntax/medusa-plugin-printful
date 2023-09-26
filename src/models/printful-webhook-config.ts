@@ -1,11 +1,13 @@
 import {
-    BeforeInsert,
-    Column,
     Entity,
+    Column,
     PrimaryColumn,
+    OneToMany,
+    BeforeInsert,
 } from "typeorm";
 import { BaseEntity } from "@medusajs/medusa";
 import { generateEntityId } from "@medusajs/medusa/dist/utils";
+import { PrintfulWebhookEvent } from "./printful-webhook-events";
 
 @Entity()
 export class PrintfulWebhookConfig extends BaseEntity {
@@ -23,6 +25,9 @@ export class PrintfulWebhookConfig extends BaseEntity {
 
     @Column({ type: "bigint", nullable: true })
     expires_at: number | null;
+
+    @OneToMany(() => PrintfulWebhookEvent, (event) => event.config)
+    events: PrintfulWebhookEvent[];
 
     @BeforeInsert()
     private beforeInsert(): void {
