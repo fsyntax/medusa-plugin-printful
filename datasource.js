@@ -5,7 +5,7 @@ const AppDataSource = new DataSource({
     port: 5432,
     username: "postgres",
     password: "fischi123",
-    database: "medusa-db-wsfmx",
+    database: "med3",
     entities: [
         "dist/models/printful-webhook-config.js",
         "dist/models/printful-webhook-events.js",

@@ -89,11 +89,11 @@ const PrintfulBarWidget = ({ product, notify }: ProductDetailsWidgetProps) => {
                                 </a>
                             </Text>
                             {isSynced ? (
-                                <Button size="small" variant="secondary" onClick={handleSync} isLoading={syncIsLoading}>
+                                <Button size="base" variant="secondary" onClick={handleSync} isLoading={syncIsLoading}>
                                     <Text>Resync</Text>
                                 </Button>
                             ) : (
-                                <Button size="small" variant="secondary" onClick={handleSync} isLoading={syncIsLoading}>
+                                <Button size="base" variant="secondary" onClick={handleSync} isLoading={syncIsLoading}>
                                     <Text>Sync</Text>
                                 </Button>
                             )}

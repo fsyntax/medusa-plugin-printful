@@ -25,6 +25,7 @@ export interface CreateWebhookConfigRequest {
     expires_at?: number | null;
     store_id?: string;
     events?: {
+        enabled?: boolean;
         type: string;
         url: string;
         params?: {
@@ -136,6 +137,7 @@ type WebhookEventType =
 export interface SetWebhookEventRequest {
     type: WebhookEventType;
     url: string;
+    enabled?: boolean;
     params?: SetWebhookEventRequestParam[];
 }
 

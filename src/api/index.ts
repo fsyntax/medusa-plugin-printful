@@ -105,25 +105,30 @@ export default (rootDirectory, options) => {
     }
   })
 
-  adminRouter.options('/admin/printful/webhook/get', cors(adminCorsOptions))
-    adminRouter.get('/admin/printful/webhook/get', cors(adminCorsOptions), async (req, res) => {
+  adminRouter.options('/admin/printful/webhook/get_saved', cors(adminCorsOptions))
+    adminRouter.get('/admin/printful/webhook/get_saved', cors(adminCorsOptions), async (req, res) => {
       const printfulWebhookService = req.scope.resolve('printfulWebhookService')
       const savedConfig = await printfulWebhookService.getSavedConfig()
       if(savedConfig) {
-        res.json(savedConfig)
+        res.json({
+            default_url: savedConfig.default_url,
+            public_key: savedConfig.public_key,
+            id: savedConfig.id,
+            expires_at: savedConfig.expires_at,
+        })
       } else {
-      const config = await printfulWebhookService.getConfig()
-      res.json(config)
+        // const config = await printfulWebhookService.getConfig()
+        res.status(404).json({ error: 'No saved config found' });
       }
     })
 
   adminRouter.options('/admin/printful/webhook/set_event', cors(adminCorsOptions))
   adminRouter.post('/admin/printful/webhook/set_event', cors(adminCorsOptions), async (req, res) => {
     const printfulWebhookService = req.scope.resolve('printfulWebhookService')
-    const { type, url, params } = req.body as any
+    const { type, url, params, enabled } = req.body as any
 
     try {
-      const result = await printfulWebhookService.setEvent(type, { url, params });
+      const result = await printfulWebhookService.setEvent(type, { url, params, enabled });
       res.json(result);
     } catch (error) {
       console.error(error);
@@ -146,12 +151,18 @@ export default (rootDirectory, options) => {
 
 
   adminRouter.options('/admin/printful/webhook/get_events', cors(adminCorsOptions))
-  adminRouter.get('/admin/printful/webhook/get_events', cors(adminCorsOptions), async (req, res) => {
+  adminRouter.post('/admin/printful/webhook/get_events', cors(adminCorsOptions), async (req, res) => {
     const printfulWebhookService = req.scope.resolve('printfulWebhookService')
-    const query = req.query as any
-    console.log(query)
-    res.json(query)
-  })
+    const { config_id } = req.body
+
+    if(!config_id) {
+        res.status(400).json({ error: 'No config id provided' });
+    }
+    const events = await printfulWebhookService.getEvents(config_id as string)
+
+    res.json(events);
+  });
+
 
   adminRouter.options('/admin/printful/webhook/events', cors(adminCorsOptions))
   adminRouter.post('/admin/printful/webhook/events', cors(adminCorsOptions), async (req, res) => {
@@ -164,15 +175,15 @@ export default (rootDirectory, options) => {
 
     // Printful secret key
     const secretKey = 'supersecret';
-console.log(rawBody, incomingSignature, secretKey)
+    console.log(rawBody, incomingSignature, secretKey)
     return res.json({rawBody, incomingSignature, secretKey})
     // Verify the signature
-    if (printfulWebhookService.verifySignature(rawBody, incomingSignature, secretKey)) {
-      // Signature is valid, process the webhook event
-    } else {
-      // Invalid signature, ignore the event
-      return res.status(401).send('Invalid signature');
-    }
+    // if (printfulWebhookService.verifySignature(rawBody, incomingSignature, secretKey)) {
+    //   // Signature is valid, process the webhook event
+    // } else {
+    //   // Invalid signature, ignore the event
+    //   return res.status(401).send('Invalid signature');
+    // }
   });
 
   return [adminRouter, storeRouter]

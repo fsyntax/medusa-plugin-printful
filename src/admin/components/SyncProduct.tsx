@@ -1,4 +1,4 @@
-import {Badge, Button, Heading, Input, Text} from "@medusajs/ui";
+import {Badge, Button, Heading, Input, Text, IconButton } from "@medusajs/ui";
 import React, { useState} from "react";
 import { useAdminCustomPost } from "medusa-react";
 import {Check, Pencil, XMark} from "@medusajs/icons";
@@ -94,35 +94,34 @@ const SyncProduct = (item: PrintfulSyncProductRes) => {
                     )}
                     {isEditing ? (
                         <div className="flex gap-2">
-                            <Button
+                            <IconButton
                                 variant="transparent"
                                 className="w-6 h-6"
-                                size="small" format="icon" onClick={() => setIsEditing(!isEditing)}
+                                size="base" onClick={() => setIsEditing(!isEditing)}
                             >
                                 <XMark/>
-                            </Button>
-                            <Button
+                            </IconButton>
+                            <IconButton
                                 variant="transparent"
                                 className="w-6 h-6"
                                 onClick={() => {
                                     handleModify({ name: newName });
                                 }}
                                 isLoading={isLoading}
-                                size="small"
-                                format="icon"
+                                size="base"
                             >
                                 <Check />
-                            </Button>
+                            </IconButton>
                         </div>
                     ) : (
-                        <Button
+                        <IconButton
                             variant="transparent"
                             className="w-6 h-6"
-                            format="icon" size="small"
+                             size="base"
                             onClick={() => setIsEditing(!isEditing)}
                         >
                             <Pencil />
-                        </Button>
+                        </IconButton>
                     )}
                 </div>
                 <hr className="my-2"/>
@@ -138,7 +137,7 @@ const SyncProduct = (item: PrintfulSyncProductRes) => {
                 className="w-full mt-2"
                 onClick={handleDesync}
                 isLoading={desyncIsLoading}
-                size="small"
+                size="base"
             >
                 Desync
             </Button>

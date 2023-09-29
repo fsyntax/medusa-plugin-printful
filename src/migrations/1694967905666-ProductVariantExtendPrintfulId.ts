@@ -11,3 +11,4 @@ export class ProductVariantExtendPrintfulId1694967905666 implements MigrationInt
     }
 
 }
+

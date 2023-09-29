@@ -3,7 +3,7 @@ import {Container, Heading, Text} from "@medusajs/ui";
 import { QueryClient } from "@tanstack/react-query";
 import {MedusaProvider, useAdminCustomQuery} from "medusa-react";
 import React from "react";
-import WebhookContainer from "../../components/WebhookConfig";
+import WebhookTabs from "../../components/webhook/WebhookTabs";
 
 const queryClient = new QueryClient({
     // defaultOptions: {
@@ -20,7 +20,7 @@ const PrintfulSettingsPage = ({notify} : SettingProps) => {
         <div>
             <MedusaProvider baseUrl="http://localhost:9000" queryClientProviderProps={{ client: queryClient }} >
                 <Heading className="mb-3" level="h1">Printful Plugin Settings</Heading>
-                <WebhookContainer notify={notify} />
+                <WebhookTabs notify={notify} />
             </MedusaProvider>
         </div>
     )

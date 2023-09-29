@@ -95,7 +95,7 @@ class PrintfulWebhookService extends TransactionBaseService {
         try {
             const { default_url, expires_at = null }: CreateWebhookConfigRequest = payload;
 
-            payload.events = this.eventTypes.map((type) => ({ type, url: default_url ?? this.defaultWebhookUrl }));
+            payload.events = this.eventTypes.map((type) => ({ type, url: default_url ?? this.defaultWebhookUrl, enabled: true }));
 
             const result: CreateWebhookConfigResponse = await this.printfulClient.post('/v2/webhooks', {
                 store_id: this.storeId,
@@ -107,7 +107,7 @@ class PrintfulWebhookService extends TransactionBaseService {
             await this.atomicPhase_(async (manager) => {
                 const printfulWebhookConfigRepo = manager.getRepository('PrintfulWebhookConfig');
                 let printfulWebhookConfig = await printfulWebhookConfigRepo.findOne({ where: { id: this.storeId } });
-                const printfulWebhookEventsRepo = manager.getRepository('PrintfulWebhookEvents');
+                const printfulWebhookEventsRepo = manager.getRepository('PrintfulWebhookEvent');
 
                 if (printfulWebhookConfig) {
                     await manager.getRepository('PrintfulWebhookConfig').update({ id: this.storeId }, {
@@ -115,7 +115,6 @@ class PrintfulWebhookService extends TransactionBaseService {
                         public_key: result.data.public_key ?? null,
                         secret_key: result.data.secret_key ?? null,
                         expires_at: result.data.expires_at ?? null,
-                        events: JSON.stringify(payload.events)
                     });
                 } else {
                     printfulWebhookConfig = printfulWebhookConfigRepo.create({
@@ -128,16 +127,28 @@ class PrintfulWebhookService extends TransactionBaseService {
                     await printfulWebhookConfigRepo.save(printfulWebhookConfig);
                 }
 
-                const events = payload.events.map((event) => {
-                    return printfulWebhookEventsRepo.create({
-                        type: event.type,
-                        url: event.url,
-                        config: printfulWebhookConfig,
+                for (const event of payload.events) {
+                    let existingEvent = await printfulWebhookEventsRepo.findOne({
+                        where: {
+                            config: { id: printfulWebhookConfig.id },
+                            type: event.type
+                        }
                     });
-                });
-                await printfulWebhookEventsRepo.save(events);
+                    if (existingEvent) {
+                        await printfulWebhookEventsRepo.update({ id: existingEvent.id }, { url: event.url });
+                    } else {
+                        let newEvent = printfulWebhookEventsRepo.create({
+                            type: event.type,
+                            url: event.url,
+                            enabled: event.enabled,
+                            config: printfulWebhookConfig,
+                        });
+                        await printfulWebhookEventsRepo.save(newEvent);
+                    }
+                }
 
             });
+
 
             this.logger.success('mpp-webhooks', '[medusa-plugin-printful]: Successfully set up Printful Webhook configurations');
             return result
@@ -150,8 +161,11 @@ class PrintfulWebhookService extends TransactionBaseService {
     async getSavedConfig() {
        try {
            const printfulWebhookConfigRepo = this.manager_.getRepository('PrintfulWebhookConfig');
+           const config =  await printfulWebhookConfigRepo.findOne({where: {id: this.storeId}})
+           if(config) {
            this.logger.success('mpp-webhooks', '[medusa-plugin-printful]: Successfully fetched saved Printful Webhook configurations')
-           return await printfulWebhookConfigRepo.findOne({where: {id: this.storeId}})
+            return config
+           }
        } catch (error) {
               this.logger.error(`[medusa-plugin-printful]: Error trying to fetch saved Printful Webhook configurations : ${error.data}`);
               throw error;
@@ -167,12 +181,20 @@ class PrintfulWebhookService extends TransactionBaseService {
      */
     async setEvent(eventType: string, payload: Omit<SetWebhookEventRequest, 'type'>): Promise<SetWebhookEventResponse> {
         try {
+
             const { result }: SetWebhookEventResponse = await this.printfulClient.post(`/v2/webhooks/${eventType}`, {
                 store_id: this.storeId,
                 ...payload
             });
-            this.logger.success('mpp-webhooks', '[medusa-plugin-printful]: Successfully set up Printful Webhook configurations');
-            return { result };
+
+             await this.atomicPhase_(async (manager) => {
+                const printfulWebhookEventsRepo = manager.getRepository('PrintfulWebhookEvent');
+                await printfulWebhookEventsRepo.update({ config: { id: this.storeId }, type: eventType }, { url: payload.url, enabled: payload.enabled });
+
+                this.logger.success('mpp-webhooks', '[medusa-plugin-printful]: Successfully set up Printful Webhook configurations');
+            });
+
+             return { result };
         } catch (error) {
             this.logger.error(`[medusa-plugin-printful]: Error trying to set up Printful Webhook configurations : ${error.data}`);
             throw error;
@@ -181,10 +203,17 @@ class PrintfulWebhookService extends TransactionBaseService {
 
     async disableEvent(eventType: string): Promise<any> {
         try {
-           await this.printfulClient.delete(`/v2/webhooks/${eventType}`, {
-               store_id: this.storeId
-           });
-            this.logger.success('mpp-webhooks', '[medusa-plugin-printful]: Successfully disabled Printful Webhook configurations');
+          return await this.atomicPhase_(async (manager) => {
+                const printfulWebhookEventsRepo = manager.getRepository('PrintfulWebhookEvent');
+
+                await this.printfulClient.delete(`/v2/webhooks/${eventType}`, {
+                    store_id: this.storeId
+                });
+
+                await printfulWebhookEventsRepo.update({ config: { id: this.storeId }, type: eventType }, { enabled: false });
+                this.logger.success('mpp-webhooks', '[medusa-plugin-printful]: Successfully disabled Printful Webhook configurations');
+            });
+
 
         } catch (error) {
             this.logger.error(`[medusa-plugin-printful]: Error trying to disable Printful Webhook configurations : ${error.data}`);
@@ -192,8 +221,22 @@ class PrintfulWebhookService extends TransactionBaseService {
         }
     }
 
-    getEventType(): string[] {
-        return this.eventTypes;
+    async getEvents(config_id: string): Promise<any>  {
+        try {
+            const printfulEventsRepo = this.manager_.getRepository('PrintfulWebhookEvent');
+            if(printfulEventsRepo) {
+                const events = await printfulEventsRepo.find({where: { config: { id: config_id} } })
+                this.logger.success('mpp-webhooks', '[medusa-plugin-printful]: Successfully fetched Printful Webhook events from repository');
+                return events
+            } else {
+                this.logger.error(`[medusa-plugin-printful]: Error trying to fetch Printful Webhook events from repository`);
+                return new Error('Error trying to fetch Printful Webhook events from repository')
+            }
+
+        } catch (e) {
+            this.logger.error(`[medusa-plugin-printful]: Error trying to fetch Printful Webhook events from repository: ${e}`);
+            throw e
+        }
     }
 }
 
