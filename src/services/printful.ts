@@ -437,6 +437,22 @@ class PrintfulService extends TransactionBaseService {
                             metadata.color_code = option.color_code
                         }
 
+                        const options_modified = [];
+
+                        if (option.size != undefined) {
+                            options_modified.push({
+                                value: option.size,
+                                label: "size"
+                            })
+                        }
+
+                        if (option.color != undefined) {
+                            options_modified.push({
+                                value: option.color,
+                                label: "color"
+                            })
+                        }
+
                         return {
                             title,
                             sku: variant.sku,
@@ -444,7 +460,8 @@ class PrintfulService extends TransactionBaseService {
                                 amount: this.convertToInteger(variant.retail_price),
                                 currency_code: variant.currency.toLowerCase()
                             }],
-                            metadata
+                            metadata,
+                            options: options_modified
                         };
                     } else {
                         console.log(`${blue('[medusa-plugin-printful]')} Creating new variant for product ${blue(medusaProduct.id)}...`);
@@ -495,6 +512,24 @@ class PrintfulService extends TransactionBaseService {
                                 metadata.color = option.color
                                 metadata.color_code = option.color_code
                             }
+
+                            const options_modified = [];
+
+                            if (option.size != undefined) {
+                                options_modified.push({
+                                    value: option.size,
+                                    label: "size"
+                                })
+                            }
+    
+                            if (option.color != undefined) {
+                                options_modified.push({
+                                    value: option.color,
+                                    label: "color"
+                                })
+                            }
+
+                            
                             return {
                                 title,
                                 sku: variant.sku,
@@ -502,7 +537,8 @@ class PrintfulService extends TransactionBaseService {
                                     amount: this.convertToInteger(variant.retail_price),
                                     currency_code: variant.currency.toLowerCase()
                                 }],
-                                metadata
+                                metadata,
+                                options: options_modified
                             };
 
                         }
