@@ -264,6 +264,22 @@ class PrintfulService extends TransactionBaseService {
                             metadata.color_code = option.color_code;
                         }
 
+                        const options_modified = [];
+
+                        if (option.size != undefined) {
+                            options_modified.push({
+                                value: option.size,
+                                label: "size"
+                            })
+                        }
+
+                        if (option.color != undefined) {
+                            options_modified.push({
+                                value: option.color,
+                                label: "color"
+                            })
+                        }
+
                         return {
                             title: productObj.title + (option.size ? ` - ${option.size}` : '') + (option.color ? ` / ${option.color}` : ''),
                             sku: sku,
@@ -275,7 +291,8 @@ class PrintfulService extends TransactionBaseService {
                                 amount: this.convertToInteger(retail_price),
                                 currency_code: currency.toLowerCase()
                             }],
-                            metadata
+                            metadata,
+                            options: options_modified
                         }
                     }
                     const variantOptions = await backOff(getVariantOptions, this.backoffOptions);
