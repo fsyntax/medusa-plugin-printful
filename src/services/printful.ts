@@ -466,11 +466,11 @@ class PrintfulService extends TransactionBaseService {
                             inventory_quantity: 100,
                             allow_backorder: true,
                             manage_inventory: false,
-                            options,
                             prices: [{
                                 amount: this.convertToInteger(variant.retail_price),
                                 currency_code: variant.currency.toLowerCase()
                             }],
+                            options
                         });
 
                         if (newVariant) {
@@ -482,13 +482,11 @@ class PrintfulService extends TransactionBaseService {
                                 medusa_id: newVariant.id,
                                 printful_id: variant.id,
                                 printful_catalog_variant_id: variant.variant_id,
-                                size: option.size,
+                                ...(option.size ? {size: option.size} : {}),
+                                ...(option.color ? {color: option.color} : {}),
+                                ...(option.color_code ? {color_code: option.color_code} : {}),
                                 ...productSizeGuide
                             };
-                            if(option.color) {
-                                metadata.color = option.color
-                                metadata.color_code = option.color_code
-                            }
                             return {
                                 title,
                                 sku: variant.sku,
