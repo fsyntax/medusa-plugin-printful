@@ -68,7 +68,7 @@ class PrintfulService extends TransactionBaseService {
         this.storeId = options.storeId;
         this.productTags = options.productTags;
         this.productCategories = options.productCategories;
-        this.categoryAliases = options.categoryAliases
+        this.categoryAliases = options.categoryAliases ?? { exactMatch: {}, inexactMatch: {} }
         this.confirmOrder = options.confirmOrder || false;
 
         this.backoffOptions = {
