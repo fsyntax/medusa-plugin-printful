@@ -251,9 +251,9 @@ class PrintfulService extends TransactionBaseService {
                             printful_product_id: product.product_id,
                             printful_catalog_product_id: product.id,
                             size_tables: productSizeGuide?.size_tables ?? null,
-                            ...(option.size && { size: option.size }),
-                            ...(option.color && { color: option.color }),
-                            ...(option.color_code && { color_code: option.color_code })
+                            ...(option.size ? {size: option.size} : {}),
+                            ...(option.color ? {color: option.color} : {}),
+                            ...(option.color_code ? {color_code: option.color_code} : {})
                         }
 
                         const options = [
@@ -412,8 +412,8 @@ class PrintfulService extends TransactionBaseService {
                             printful_id: variant.id,
                             printful_catalog_variant_id: variant.variant_id,
                             size: option.size,
-                            ...(option.color && { color: option.color }),
-                            ...(option.color_code && { color_code: option.color_code }),
+                            ...(option.color ? {color: option.color} : {}),
+                            ...(option.color_code ? {color_code: option.color_code} : {}),
                             ...productSizeGuide,
                         };
 
