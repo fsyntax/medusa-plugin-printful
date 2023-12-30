@@ -412,6 +412,7 @@ class PrintfulService extends TransactionBaseService {
                         const options = {
                             ...(option.size ? {size: option.size} : {}),
                             ...(option.color ? {color: option.color} : {}),
+                            ...(option.color_code ? {color_code: option.color_code} : {})
                         }
 
                         const metadata = {
@@ -442,6 +443,7 @@ class PrintfulService extends TransactionBaseService {
 
                         const sizeOptionId = medusaProduct.options.find(o => o.title === 'size')?.id ?? null;
                         const colorOptionId = medusaProduct.options.find(o => o.title === 'color')?.id ?? null;
+                        const colorCodeOptionId = medusaProduct.options.find(o => o.title === 'color_code')?.id ?? null;
 
                         const options = [];
                         if (sizeOptionId) {
@@ -454,6 +456,12 @@ class PrintfulService extends TransactionBaseService {
                             options.push({
                                 option_id: colorOptionId,
                                 value: option.color
+                            })
+                        }
+                        if (colorCodeOptionId) {
+                            options.push({
+                                option_id: colorCodeOptionId,
+                                value: option.color_code
                             })
                         }
 
