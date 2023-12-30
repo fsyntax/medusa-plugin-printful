@@ -411,7 +411,7 @@ class PrintfulService extends TransactionBaseService {
                             medusa_id: medusaVariant.id,
                             printful_id: variant.id,
                             printful_catalog_variant_id: variant.variant_id,
-                            size: option.size,
+                            ...(option.size ? {size: option.size} : {}),
                             ...(option.color ? {color: option.color} : {}),
                             ...(option.color_code ? {color_code: option.color_code} : {}),
                             ...productSizeGuide,
