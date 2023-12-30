@@ -275,7 +275,8 @@ class PrintfulService extends TransactionBaseService {
                                 amount: this.convertToInteger(retail_price),
                                 currency_code: currency.toLowerCase()
                             }],
-                            metadata
+                            metadata,
+                            options
                         }
                     }
                     const variantOptions = await backOff(getVariantOptions, this.backoffOptions);
@@ -407,6 +408,12 @@ class PrintfulService extends TransactionBaseService {
 
                     if (medusaVariant !== undefined) {
                         const title = productObj.title + (option.size ? ` - ${option.size}` : '') + (option.color ? ` / ${option.color}` : '');
+
+                        const options = {
+                            ...(option.size ? {size: option.size} : {}),
+                            ...(option.color ? {color: option.color} : {}),
+                        }
+
                         const metadata = {
                             medusa_id: medusaVariant.id,
                             printful_id: variant.id,
@@ -427,7 +434,8 @@ class PrintfulService extends TransactionBaseService {
                                 amount: this.convertToInteger(variant.retail_price),
                                 currency_code: variant.currency.toLowerCase()
                             }],
-                            metadata
+                            metadata,
+                            options
                         };
                     } else {
                         console.log(`${blue('[medusa-plugin-printful]')} Creating new variant for product ${blue(medusaProduct.id)}...`);
@@ -485,7 +493,8 @@ class PrintfulService extends TransactionBaseService {
                                     amount: this.convertToInteger(variant.retail_price),
                                     currency_code: variant.currency.toLowerCase()
                                 }],
-                                metadata
+                                metadata,
+                                options
                             };
 
                         }
