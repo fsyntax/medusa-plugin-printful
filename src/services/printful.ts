@@ -244,12 +244,6 @@ class PrintfulService extends TransactionBaseService {
                     const getVariantOptions = async () => {
                         const {result: {variant: option}} = await this.printfulClient.get(`products/variant/${variant_id}`);
 
-                        const options = {
-                            ...(option.size ? {size: option.size} : {}),
-                            ...(option.color ? {color: option.color} : {}),
-                            ...(option.color_code ? {color_code: option.color_code} : {})
-                        }
-
                         const metadata = {
                             brand: product.name,
                             printful_id: id,
@@ -257,12 +251,16 @@ class PrintfulService extends TransactionBaseService {
                             printful_product_id: product.product_id,
                             printful_catalog_product_id: product.id,
                             size_tables: productSizeGuide?.size_tables ?? null,
-                            ...options
+                            ...(option.size && { size: option.size }),
+                            ...(option.color && { color: option.color }),
+                            ...(option.color_code && { color_code: option.color_code })
                         }
-                        if(option.color) {
-                            metadata.color = option.color;
-                            metadata.color_code = option.color_code;
-                        }
+
+                        const options = [
+                            ...(option.size ? [{ value: option.size }] : []),
+                            ...(option.color ? [{ value: option.color }] : []),
+                            ...(option.color_code ? [{ value: option.color_code }] : [])
+                        ];
 
                         return {
                             title: productObj.title + (option.size ? ` - ${option.size}` : '') + (option.color ? ` / ${option.color}` : ''),
@@ -409,24 +407,21 @@ class PrintfulService extends TransactionBaseService {
                     if (medusaVariant !== undefined) {
                         const title = productObj.title + (option.size ? ` - ${option.size}` : '') + (option.color ? ` / ${option.color}` : '');
 
-                        const options = {
-                            ...(option.size ? {size: option.size} : {}),
-                            ...(option.color ? {color: option.color} : {}),
-                            ...(option.color_code ? {color_code: option.color_code} : {})
-                        }
-
                         const metadata = {
                             medusa_id: medusaVariant.id,
                             printful_id: variant.id,
                             printful_catalog_variant_id: variant.variant_id,
                             size: option.size,
-                            ...productSizeGuide
+                            ...(option.color && { color: option.color }),
+                            ...(option.color_code && { color_code: option.color_code }),
+                            ...productSizeGuide,
                         };
 
-                        if(option.color) {
-                            metadata.color = option.color
-                            metadata.color_code = option.color_code
-                        }
+                        const options = [
+                            ...(option.size ? [{ value: option.size }] : []),
+                            ...(option.color ? [{ value: option.color }] : []),
+                            ...(option.color_code ? [{ value: option.color_code }] : [])
+                        ];
 
                         return {
                             title,
