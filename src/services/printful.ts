@@ -294,27 +294,6 @@ class PrintfulService extends TransactionBaseService {
             try {
                 const createdProduct = await this.productService.create(productToPush);
                 console.log(`${green('[medusa-plugin-printful]:')} Created product in Medusa: ${green(createdProduct.id)}`);
-                if (createdProduct) {
-                    console.log(`${blue("[medusa-plugin-printful]:")} Trying to add options to variants...`);
-                    const {variants, options} = await this.productService.retrieve(createdProduct.id, {
-                        relations: ['variants', 'options'],
-                    });
-
-
-                    for (const option of options) {
-                        for (const variant of variants) {
-                            if (option.title === 'size' || option.title === 'color') {
-                                const value = variant.metadata[option.title];
-                                if (value !== null) {
-                                    const addedOption = await this.productVariantService.addOptionValue(variant.id, option.id, value as string);
-                                    if (addedOption) {
-                                        console.log(`${green('[medusa-plugin-printful]:')} Updated variant ${variant.id} option ${option.id} to ${value}! ✅`);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
             } catch (e) {
                 console.error(`${red("[medusa-plugin-printful]:")} There appeared an error trying to create '${red(productObj.title)}' in Medusa: `, e)
                 throw e
