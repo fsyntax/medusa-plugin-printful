@@ -244,12 +244,6 @@ class PrintfulService extends TransactionBaseService {
                     const getVariantOptions = async () => {
                         const {result: {variant: option}} = await this.printfulClient.get(`products/variant/${variant_id}`);
 
-                        const options = {
-                            ...(option.size ? {size: option.size} : {}),
-                            ...(option.color ? {color: option.color} : {}),
-                            ...(option.color_code ? {color_code: option.color_code} : {})
-                        }
-
                         const metadata = {
                             brand: product.name,
                             printful_id: id,
@@ -257,12 +251,15 @@ class PrintfulService extends TransactionBaseService {
                             printful_product_id: product.product_id,
                             printful_catalog_product_id: product.id,
                             size_tables: productSizeGuide?.size_tables ?? null,
-                            ...options
+                            ...(option.size ? {size: option.size} : {}),
+                            ...(option.color ? {color: option.color} : {}),
+                            ...(option.color_code ? {color_code: option.color_code} : {})
                         }
-                        if(option.color) {
-                            metadata.color = option.color;
-                            metadata.color_code = option.color_code;
-                        }
+
+                        const options = [
+                            ...(option.size ? [{ value: option.size }] : []),
+                            ...(option.color ? [{ value: option.color }] : []),
+                        ];
 
                         return {
                             title: productObj.title + (option.size ? ` - ${option.size}` : '') + (option.color ? ` / ${option.color}` : ''),
@@ -275,7 +272,8 @@ class PrintfulService extends TransactionBaseService {
                                 amount: this.convertToInteger(retail_price),
                                 currency_code: currency.toLowerCase()
                             }],
-                            metadata
+                            metadata,
+                            options
                         }
                     }
                     const variantOptions = await backOff(getVariantOptions, this.backoffOptions);
@@ -296,27 +294,6 @@ class PrintfulService extends TransactionBaseService {
             try {
                 const createdProduct = await this.productService.create(productToPush);
                 console.log(`${green('[medusa-plugin-printful]:')} Created product in Medusa: ${green(createdProduct.id)}`);
-                if (createdProduct) {
-                    console.log(`${blue("[medusa-plugin-printful]:")} Trying to add options to variants...`);
-                    const {variants, options} = await this.productService.retrieve(createdProduct.id, {
-                        relations: ['variants', 'options'],
-                    });
-
-
-                    for (const option of options) {
-                        for (const variant of variants) {
-                            if (option.title === 'size' || option.title === 'color') {
-                                const value = variant.metadata[option.title];
-                                if (value !== null) {
-                                    const addedOption = await this.productVariantService.addOptionValue(variant.id, option.id, value as string);
-                                    if (addedOption) {
-                                        console.log(`${green('[medusa-plugin-printful]:')} Updated variant ${variant.id} option ${option.id} to ${value}! ✅`);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
             } catch (e) {
                 console.error(`${red("[medusa-plugin-printful]:")} There appeared an error trying to create '${red(productObj.title)}' in Medusa: `, e)
                 throw e
@@ -407,18 +384,21 @@ class PrintfulService extends TransactionBaseService {
 
                     if (medusaVariant !== undefined) {
                         const title = productObj.title + (option.size ? ` - ${option.size}` : '') + (option.color ? ` / ${option.color}` : '');
+
                         const metadata = {
                             medusa_id: medusaVariant.id,
                             printful_id: variant.id,
                             printful_catalog_variant_id: variant.variant_id,
-                            size: option.size,
-                            ...productSizeGuide
+                            ...(option.size ? {size: option.size} : {}),
+                            ...(option.color ? {color: option.color} : {}),
+                            ...(option.color_code ? {color_code: option.color_code} : {}),
+                            ...productSizeGuide,
                         };
 
-                        if(option.color) {
-                            metadata.color = option.color
-                            metadata.color_code = option.color_code
-                        }
+                        const options = [
+                            ...(option.size ? [{ value: option.size }] : []),
+                            ...(option.color ? [{ value: option.color }] : []),
+                        ];
 
                         return {
                             title,
@@ -427,7 +407,8 @@ class PrintfulService extends TransactionBaseService {
                                 amount: this.convertToInteger(variant.retail_price),
                                 currency_code: variant.currency.toLowerCase()
                             }],
-                            metadata
+                            metadata,
+                            options
                         };
                     } else {
                         console.log(`${blue('[medusa-plugin-printful]')} Creating new variant for product ${blue(medusaProduct.id)}...`);
@@ -455,11 +436,11 @@ class PrintfulService extends TransactionBaseService {
                             inventory_quantity: 100,
                             allow_backorder: true,
                             manage_inventory: false,
-                            options,
                             prices: [{
                                 amount: this.convertToInteger(variant.retail_price),
                                 currency_code: variant.currency.toLowerCase()
                             }],
+                            options
                         });
 
                         if (newVariant) {
@@ -471,13 +452,11 @@ class PrintfulService extends TransactionBaseService {
                                 medusa_id: newVariant.id,
                                 printful_id: variant.id,
                                 printful_catalog_variant_id: variant.variant_id,
-                                size: option.size,
+                                ...(option.size ? {size: option.size} : {}),
+                                ...(option.color ? {color: option.color} : {}),
+                                ...(option.color_code ? {color_code: option.color_code} : {}),
                                 ...productSizeGuide
                             };
-                            if(option.color) {
-                                metadata.color = option.color
-                                metadata.color_code = option.color_code
-                            }
                             return {
                                 title,
                                 sku: variant.sku,
@@ -485,7 +464,8 @@ class PrintfulService extends TransactionBaseService {
                                     amount: this.convertToInteger(variant.retail_price),
                                     currency_code: variant.currency.toLowerCase()
                                 }],
-                                metadata
+                                metadata,
+                                options
                             };
 
                         }
