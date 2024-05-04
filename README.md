@@ -18,6 +18,11 @@
 ![Downloads](https://img.shields.io/npm/dt/medusa-plugin-printful) ![Contributors](https://img.shields.io/github/contributors/fsyntax/medusa-plugin-printful?color=dark-green) ![Issues](https://img.shields.io/github/issues/fsyntax/medusa-plugin-printful)
 
 
+### Important
+**This plugin is not being actively developed or maintained due to my current time constraints and capacity. There is a possibility that I may resume development in the future.
+If you are interested in contributing to or maintaining this project, please feel free to fork the repository and continue its development!
+Thank you for your understanding and support.**
+
 ## Table Of Contents
 
 - [About the Project](#about-the-project)
@@ -36,10 +41,6 @@
 - [Acknowledgements](#acknowledgements)
 
 ## About The Project
-
-
-### Caution
-**Important:** This plugin is currently under development and may contain bugs or limitations. We strongly recommend testing it thoroughly before deploying it in a production environment. Please report any issues to improve the plugin.
 
 **Medusa-Plugin-Printful** is a plugin for the Medusa e-commerce platform that integrates with the Printful fulfillment service. This plugin simplifies the management of Printful products and orders through the Medusa dashboard, streamlining workflows and saving time.
 
